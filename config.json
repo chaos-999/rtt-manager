@@ -1,0 +1,116 @@
+{
+  "start_first": false,
+  "key_base": "C:\\Users\\33225\\Desktop\\密钥对",
+  "script_path": "C:\\Users\\33225\\Desktop\\tcp_rtt.sh",
+  "results_dir": "C:\\Users\\33225\\Desktop\\测量结果",
+  "defaults": {
+    "count": 1000,
+    "time": "15:30:00"
+  },
+  "nodes": [
+    {
+      "name": "深圳",
+      "ip": "47.106.194.50",
+      "wg_ip": "10.10.0.1",
+      "public_key": "VJyp22qhxkmnwJIZQXnz1a0efFjsfkIuR/3uYk5I7RA=",
+      "listen_port": 51820,
+      "dynamic": false,
+      "key_dir": "深圳",
+      "role": "gateway"
+    },
+    {
+      "name": "上海",
+      "ip": "47.103.213.37",
+      "wg_ip": "10.10.0.2",
+      "public_key": "2L392T6R4oloGuJMB6D6FYoY3xAeCAovlpHjZtLfSjs=",
+      "listen_port": 51820,
+      "dynamic": false,
+      "key_dir": "上海",
+      "role": "server"
+    },
+    {
+      "name": "杭州",
+      "ip": "121.41.15.76",
+      "wg_ip": "10.10.0.3",
+      "public_key": "5HtuLMv3O1Ic/CaINUAesewJNkUu1m+FWS8LdPlOkws=",
+      "listen_port": 51820,
+      "dynamic": false,
+      "key_dir": "杭州",
+      "role": "relay"
+    },
+    {
+      "name": "北京",
+      "ip": "47.94.74.31",
+      "wg_ip": "10.10.0.4",
+      "public_key": "GIKHLAZ3rPI2YD1JgkG54n2VRlXJnVV3zSnPJRtZVBU=",
+      "listen_port": 51820,
+      "dynamic": false,
+      "key_dir": "北京",
+      "role": "client"
+    },
+    {
+      "name": "成都",
+      "ip": "47.109.79.59",
+      "wg_ip": "10.10.0.7",
+      "public_key": "gX0RVZDpJCIDnGisWJJ+v7YiJh2H7MVWZTbSFqFS83A=",
+      "listen_port": 51820,
+      "dynamic": false,
+      "key_dir": "成都",
+      "role": "relay"
+    },
+    {
+      "name": "青岛",
+      "ip": "118.190.200.176",
+      "wg_ip": "10.10.0.8",
+      "public_key": "Fy1MKs/9Ul6rLct+HAnSvbODorOHRA0p2nmfigO8gB4=",
+      "listen_port": 51820,
+      "dynamic": false,
+      "key_dir": "青岛",
+      "role": "relay"
+    }
+  ],
+  "edges": [
+    {
+      "source": "深圳",
+      "target": "上海"
+    },
+    {
+      "source": "上海",
+      "target": "成都"
+    },
+    {
+      "source": "上海",
+      "target": "杭州"
+    },
+    {
+      "source": "上海",
+      "target": "青岛"
+    },
+    {
+      "source": "杭州",
+      "target": "北京"
+    },
+    {
+      "source": "青岛",
+      "target": "北京"
+    },
+    {
+      "source": "深圳",
+      "target": "成都"
+    }
+  ],
+  "active_edges": [
+    {
+      "source": "深圳",
+      "target": "上海"
+    },
+    {
+      "source": "上海",
+      "target": "青岛"
+    },
+    {
+      "source": "青岛",
+      "target": "北京"
+    }
+  ]
+}
