@@ -128,7 +128,7 @@ def schedule_task(cfg, start_time, count, selected=None):
         cmd = (
             f"systemd-run --on-calendar=\"{start_time}\" "
             f"--unit=\"sync-{time_str}-$(date +%s)\" /bin/bash -c "
-            f"\"/root/tcp_rtt.sh {count} > /root/rtt_results/sync_{time_str}_$(hostname).log 2>&1\""
+            f"\"TAG={time_str} /root/tcp_rtt.sh {count} > /root/rtt_results/sync_{time_str}_$(hostname).log 2>&1\""
         )
         code, out, err = ssh.run_ssh(n["ip"], key, cmd)
         return {"name": n["name"], "ip": n["ip"], "ok": code == 0, "detail": (out + err).strip()}
@@ -304,11 +304,25 @@ def fetch_results(cfg, time_str, selected=None):
         # 1. 检查是否生成 log 文件
         code, out, err = ssh.run_ssh(n["ip"], key, f"ls /root/rtt_results/sync_{time_str}*.log 2>/dev/null")
         if code == 0 and f"sync_{time_str}" in out:
+            # 先拉日志
             rc, o, e = ssh.pull_files(n["ip"], key, f"/root/rtt_results/sync_{time_str}*", target_dir)
             ok = rc == 0
-            if ok:
+            # 从日志里解析实际生成的 CSV 路径（日志末尾有 "汇总：/root/rtt_results/xxx.csv"）
+            # 不依赖文件名时间戳，避免定时任务实际执行时间与下发时间秒级偏差导致拉不到
+            _, gout, _ = ssh.run_ssh(n["ip"], key,
+                f"grep -ho '/root/rtt_results/[^ ]*\\.csv' /root/rtt_results/sync_{time_str}*.log 2>/dev/null | head -1")
+            ok2 = False
+            if gout.strip():
+                csv_path = gout.strip().splitlines()[0]
+                prefix = csv_path.rsplit("/", 1)[-1]
+                if prefix.endswith(".csv"):
+                    prefix = prefix[:-4]
+                rc2, o2, e2 = ssh.pull_files(n["ip"], key, f"/root/rtt_results/{prefix}*.csv", target_dir)
+                ok2 = rc2 == 0
+            if ok or ok2:
                 pulled_flag.append(True)
-            return {"name": n["name"], "ip": n["ip"], "ok": ok, "detail": "已拉取结果文件" if ok else (o + e).strip()}
+            return {"name": n["name"], "ip": n["ip"], "ok": ok or ok2,
+                    "detail": "已拉取日志+CSV" if (ok and ok2) else ("已拉取日志(无CSV)" if ok else (o + e).strip())}
         # 2. 检查任务是否还在运行
         code2, out2, _ = ssh.run_ssh(n["ip"], key, f"systemctl list-units 'sync-*' --all --no-legend | grep '{time_str}'")
         if code2 == 0 and "running" in out2:

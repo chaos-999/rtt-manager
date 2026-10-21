@@ -510,3 +510,106 @@
 2026-10-21 16:28:02,719 INFO uvicorn.access: 127.0.0.1:64232 - "GET /api/config HTTP/1.1" 200
 2026-10-21 16:28:11,391 INFO uvicorn.access: 127.0.0.1:50701 - "GET /api/nodes/test?nodes=%E6%B7%B1%E5%9C%B3%2C%E4%B8%8A%E6%B5%B7%2C%E6%9D%AD%E5%B7%9E%2C%E5%8C%97%E4%BA%AC%2C%E6%88%90%E9%83%BD%2C%E9%9D%92%E5%B2%9B HTTP/1.1" 200
 2026-10-21 16:28:13,287 INFO uvicorn.access: 127.0.0.1:50701 - "GET /api/nodes/ntp?nodes=%E6%B7%B1%E5%9C%B3%2C%E4%B8%8A%E6%B5%B7%2C%E6%9D%AD%E5%B7%9E%2C%E5%8C%97%E4%BA%AC%2C%E6%88%90%E9%83%BD%2C%E9%9D%92%E5%B2%9B HTTP/1.1" 200
+2026-10-21 18:48:33,567 INFO uvicorn.error: Started server process [47708]
+2026-10-21 18:48:33,568 INFO uvicorn.error: Waiting for application startup.
+2026-10-21 18:48:33,572 INFO uvicorn.error: Application startup complete.
+2026-10-21 18:48:33,573 INFO uvicorn.error: Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+2026-10-21 18:51:04,122 INFO uvicorn.access: 127.0.0.1:55384 - "GET / HTTP/1.1" 200
+2026-10-21 18:51:04,148 INFO uvicorn.access: 127.0.0.1:55384 - "GET /static/style.css HTTP/1.1" 304
+2026-10-21 18:51:04,157 INFO uvicorn.access: 127.0.0.1:55384 - "GET /static/app.js?v=20261022 HTTP/1.1" 304
+2026-10-21 18:51:04,169 INFO uvicorn.access: 127.0.0.1:55384 - "GET /api/auth/status HTTP/1.1" 200
+2026-10-21 18:51:04,196 INFO uvicorn.access: 127.0.0.1:55384 - "GET /api/auth/status HTTP/1.1" 200
+2026-10-21 18:51:04,209 INFO uvicorn.access: 127.0.0.1:55384 - "GET /favicon.ico HTTP/1.1" 404
+2026-10-21 18:51:04,226 INFO uvicorn.access: 127.0.0.1:55384 - "GET /favicon.ico HTTP/1.1" 404
+2026-10-21 18:51:08,980 INFO uvicorn.access: 127.0.0.1:55384 - "POST /api/auth/login HTTP/1.1" 200
+2026-10-21 18:51:11,014 INFO uvicorn.access: 127.0.0.1:55384 - "POST /api/auth/login HTTP/1.1" 200
+2026-10-21 18:51:11,020 INFO uvicorn.access: 127.0.0.1:55384 - "GET /api/config HTTP/1.1" 200
+2026-10-21 18:56:35,542 INFO uvicorn.access: 127.0.0.1:56939 - "POST /api/tasks/clean HTTP/1.1" 200
+2026-10-21 18:56:36,886 INFO uvicorn.access: 127.0.0.1:56939 - "POST /api/tasks/schedule HTTP/1.1" 200
+2026-10-21 18:56:43,337 INFO uvicorn.access: 127.0.0.1:57704 - "GET /api/tasks/timers?nodes=%E6%B7%B1%E5%9C%B3%2C%E4%B8%8A%E6%B5%B7%2C%E6%9D%AD%E5%B7%9E%2C%E5%8C%97%E4%BA%AC%2C%E6%88%90%E9%83%BD%2C%E9%9D%92%E5%B2%9B HTTP/1.1" 200
+2026-10-21 18:56:52,073 INFO uvicorn.access: 127.0.0.1:59926 - "POST /api/tcp_rtt/generate HTTP/1.1" 200
+2026-10-21 18:56:57,499 INFO uvicorn.access: 127.0.0.1:59926 - "POST /api/tcp_rtt/deploy HTTP/1.1" 200
+2026-10-21 18:57:04,405 INFO uvicorn.access: 127.0.0.1:57514 - "POST /api/tcp_rtt/generate HTTP/1.1" 200
+2026-10-21 18:57:13,339 INFO uvicorn.access: 127.0.0.1:49885 - "POST /api/tasks/clean HTTP/1.1" 200
+2026-10-21 18:57:24,160 INFO uvicorn.error: Shutting down
+2026-10-21 18:57:24,262 INFO uvicorn.error: Waiting for application shutdown.
+2026-10-21 18:57:24,263 INFO uvicorn.error: Application shutdown complete.
+2026-10-21 18:57:24,263 INFO uvicorn.error: Finished server process [47708]
+2026-10-21 18:57:24,265 INFO uvicorn.error: Started server process [47708]
+2026-10-21 18:57:24,265 INFO uvicorn.error: Waiting for application startup.
+2026-10-21 18:57:24,265 INFO uvicorn.error: Application startup complete.
+2026-10-21 18:57:24,265 INFO uvicorn.error: Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+2026-10-21 18:57:25,392 INFO uvicorn.access: 127.0.0.1:55390 - "GET / HTTP/1.1" 200
+2026-10-21 18:57:25,435 INFO uvicorn.access: 127.0.0.1:55390 - "GET /api/auth/status HTTP/1.1" 200
+2026-10-21 18:57:27,899 INFO uvicorn.access: 127.0.0.1:55390 - "POST /api/auth/login HTTP/1.1" 200
+2026-10-21 18:57:27,902 INFO uvicorn.access: 127.0.0.1:55390 - "GET /api/config HTTP/1.1" 200
+2026-10-21 18:57:35,442 INFO uvicorn.access: 127.0.0.1:56769 - "POST /api/wg/preview HTTP/1.1" 200
+2026-10-21 18:57:43,340 INFO uvicorn.access: 127.0.0.1:56769 - "POST /api/wg/deploy HTTP/1.1" 200
+2026-10-21 18:58:00,808 INFO uvicorn.access: 127.0.0.1:61994 - "POST /api/tcp_rtt/generate HTTP/1.1" 200
+2026-10-21 18:58:01,173 INFO uvicorn.access: 127.0.0.1:56336 - "POST /api/tasks/schedule HTTP/1.1" 200
+2026-10-21 18:58:07,727 INFO uvicorn.access: 127.0.0.1:56336 - "POST /api/tcp_rtt/deploy HTTP/1.1" 200
+2026-10-21 18:58:09,241 INFO uvicorn.access: 127.0.0.1:56336 - "POST /api/tcp_rtt/generate HTTP/1.1" 200
+2026-10-21 18:58:19,266 INFO uvicorn.access: 127.0.0.1:55955 - "GET /api/tasks/timers?nodes=%E6%B7%B1%E5%9C%B3%2C%E4%B8%8A%E6%B5%B7%2C%E6%9D%AD%E5%B7%9E%2C%E5%8C%97%E4%BA%AC%2C%E6%88%90%E9%83%BD%2C%E9%9D%92%E5%B2%9B HTTP/1.1" 200
+2026-10-21 18:58:31,587 INFO uvicorn.access: 127.0.0.1:59345 - "POST /api/tasks/fetch_results HTTP/1.1" 200
+2026-10-21 18:59:01,548 INFO uvicorn.access: 127.0.0.1:57615 - "POST /api/tasks/fetch_results HTTP/1.1" 200
+2026-10-21 19:01:50,045 INFO uvicorn.error: Shutting down
+2026-10-21 19:01:50,147 INFO uvicorn.error: Waiting for application shutdown.
+2026-10-21 19:01:50,148 INFO uvicorn.error: Application shutdown complete.
+2026-10-21 19:01:50,148 INFO uvicorn.error: Finished server process [47708]
+2026-10-21 19:01:50,150 INFO uvicorn.error: Started server process [47708]
+2026-10-21 19:01:50,150 INFO uvicorn.error: Waiting for application startup.
+2026-10-21 19:01:50,150 INFO uvicorn.error: Application startup complete.
+2026-10-21 19:01:50,150 INFO uvicorn.error: Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+2026-10-21 19:01:52,521 INFO uvicorn.access: 127.0.0.1:57613 - "GET / HTTP/1.1" 200
+2026-10-21 19:01:52,566 INFO uvicorn.access: 127.0.0.1:57613 - "GET /api/auth/status HTTP/1.1" 200
+2026-10-21 19:01:54,986 INFO uvicorn.access: 127.0.0.1:57613 - "POST /api/auth/login HTTP/1.1" 200
+2026-10-21 19:01:54,989 INFO uvicorn.access: 127.0.0.1:57613 - "GET /api/config HTTP/1.1" 200
+2026-10-21 19:02:04,513 INFO uvicorn.access: 127.0.0.1:57332 - "POST /api/wg/preview HTTP/1.1" 200
+2026-10-21 19:02:19,892 INFO uvicorn.access: 127.0.0.1:57332 - "POST /api/wg/deploy HTTP/1.1" 200
+2026-10-21 19:02:36,780 INFO uvicorn.access: 127.0.0.1:62974 - "POST /api/tcp_rtt/generate HTTP/1.1" 200
+2026-10-21 19:02:38,067 INFO uvicorn.access: 127.0.0.1:56003 - "POST /api/tasks/schedule HTTP/1.1" 200
+2026-10-21 19:02:44,277 INFO uvicorn.access: 127.0.0.1:56003 - "POST /api/tcp_rtt/deploy HTTP/1.1" 200
+2026-10-21 19:02:44,450 INFO uvicorn.access: 127.0.0.1:56003 - "POST /api/tcp_rtt/generate HTTP/1.1" 200
+2026-10-21 19:02:53,097 INFO uvicorn.access: 127.0.0.1:58366 - "GET /api/tasks/timers?nodes=%E6%B7%B1%E5%9C%B3%2C%E4%B8%8A%E6%B5%B7%2C%E6%9D%AD%E5%B7%9E%2C%E5%8C%97%E4%BA%AC%2C%E6%88%90%E9%83%BD%2C%E9%9D%92%E5%B2%9B HTTP/1.1" 200
+2026-10-21 19:04:23,118 INFO uvicorn.access: 127.0.0.1:57289 - "POST /api/tcp_rtt/generate HTTP/1.1" 200
+2026-10-21 19:04:28,824 INFO uvicorn.access: 127.0.0.1:57289 - "POST /api/tasks/fetch_results HTTP/1.1" 200
+2026-10-21 19:04:42,520 INFO uvicorn.access: 127.0.0.1:54118 - "POST /api/tcp_rtt/generate HTTP/1.1" 200
+2026-10-21 19:08:30,661 INFO uvicorn.error: Started server process [47680]
+2026-10-21 19:08:30,661 INFO uvicorn.error: Waiting for application startup.
+2026-10-21 19:08:30,662 INFO uvicorn.error: Application startup complete.
+2026-10-21 19:08:30,663 INFO uvicorn.error: Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+2026-10-21 19:08:33,890 INFO uvicorn.access: 127.0.0.1:63027 - "GET / HTTP/1.1" 200
+2026-10-21 19:08:33,922 INFO uvicorn.access: 127.0.0.1:63027 - "GET /static/style.css HTTP/1.1" 304
+2026-10-21 19:08:33,922 INFO uvicorn.access: 127.0.0.1:51456 - "GET /static/app.js?v=20261022 HTTP/1.1" 304
+2026-10-21 19:08:33,935 INFO uvicorn.access: 127.0.0.1:51456 - "GET /api/auth/status HTTP/1.1" 200
+2026-10-21 19:08:36,519 INFO uvicorn.access: 127.0.0.1:51456 - "POST /api/auth/login HTTP/1.1" 200
+2026-10-21 19:08:36,522 INFO uvicorn.access: 127.0.0.1:51456 - "GET /api/config HTTP/1.1" 200
+2026-10-21 19:08:39,502 INFO uvicorn.access: 127.0.0.1:51456 - "POST /api/tcp_rtt/generate HTTP/1.1" 200
+2026-10-21 19:09:58,170 INFO uvicorn.access: 127.0.0.1:63451 - "POST /api/tcp_rtt/deploy HTTP/1.1" 200
+2026-10-21 19:10:14,965 INFO uvicorn.access: 127.0.0.1:64000 - "POST /api/tasks/schedule HTTP/1.1" 200
+2026-10-21 19:10:21,089 INFO uvicorn.access: 127.0.0.1:61370 - "POST /api/tcp_rtt/generate HTTP/1.1" 200
+2026-10-21 19:10:25,830 INFO uvicorn.access: 127.0.0.1:61370 - "POST /api/tcp_rtt/deploy HTTP/1.1" 200
+2026-10-21 19:12:06,940 INFO uvicorn.access: 127.0.0.1:58470 - "POST /api/tasks/fetch_results HTTP/1.1" 200
+2026-10-21 19:14:46,834 INFO uvicorn.access: 127.0.0.1:64363 - "POST /api/tcp_rtt/generate HTTP/1.1" 200
+2026-10-21 19:15:08,635 INFO uvicorn.error: Shutting down
+2026-10-21 19:15:08,739 INFO uvicorn.error: Waiting for application shutdown.
+2026-10-21 19:15:08,739 INFO uvicorn.error: Application shutdown complete.
+2026-10-21 19:15:08,739 INFO uvicorn.error: Finished server process [47680]
+2026-10-21 19:15:08,742 INFO uvicorn.error: Started server process [47680]
+2026-10-21 19:15:08,742 INFO uvicorn.error: Waiting for application startup.
+2026-10-21 19:15:08,742 INFO uvicorn.error: Application startup complete.
+2026-10-21 19:15:08,743 INFO uvicorn.error: Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+2026-10-21 19:15:17,468 INFO uvicorn.access: 127.0.0.1:54568 - "GET / HTTP/1.1" 200
+2026-10-21 19:15:17,514 INFO uvicorn.access: 127.0.0.1:54568 - "GET /api/auth/status HTTP/1.1" 200
+2026-10-21 19:15:20,078 INFO uvicorn.access: 127.0.0.1:54568 - "POST /api/auth/login HTTP/1.1" 200
+2026-10-21 19:15:20,081 INFO uvicorn.access: 127.0.0.1:54568 - "GET /api/config HTTP/1.1" 200
+2026-10-21 19:15:32,185 INFO uvicorn.access: 127.0.0.1:64941 - "POST /api/tcp_rtt/generate HTTP/1.1" 200
+2026-10-21 19:15:33,121 INFO uvicorn.access: 127.0.0.1:59266 - "POST /api/tasks/schedule HTTP/1.1" 200
+2026-10-21 19:15:35,426 INFO uvicorn.access: 127.0.0.1:59266 - "POST /api/tcp_rtt/deploy HTTP/1.1" 200
+2026-10-21 19:15:38,441 INFO uvicorn.access: 127.0.0.1:59266 - "POST /api/tasks/clean HTTP/1.1" 200
+2026-10-21 19:15:39,882 INFO uvicorn.access: 127.0.0.1:59266 - "POST /api/tasks/schedule HTTP/1.1" 200
+2026-10-21 19:15:42,100 INFO uvicorn.access: 127.0.0.1:59266 - "GET /api/tasks/timers?nodes=%E6%B7%B1%E5%9C%B3%2C%E4%B8%8A%E6%B5%B7%2C%E6%9D%AD%E5%B7%9E%2C%E5%8C%97%E4%BA%AC%2C%E6%88%90%E9%83%BD%2C%E9%9D%92%E5%B2%9B HTTP/1.1" 200
+2026-10-21 19:15:46,668 INFO uvicorn.access: 127.0.0.1:59266 - "POST /api/tcp_rtt/generate HTTP/1.1" 200
+2026-10-21 19:15:49,336 INFO uvicorn.access: 127.0.0.1:59266 - "POST /api/tcp_rtt/deploy HTTP/1.1" 200
+2026-10-21 19:16:53,807 INFO uvicorn.access: 127.0.0.1:58955 - "POST /api/tasks/fetch_results HTTP/1.1" 200
+2026-10-21 19:17:08,082 INFO uvicorn.access: 127.0.0.1:60842 - "POST /api/tcp_rtt/generate HTTP/1.1" 200

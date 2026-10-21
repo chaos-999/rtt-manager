@@ -41,7 +41,7 @@ SCRIPT_TAIL = r'''    "")
     *) echo "未识别的 WireGuard IP: $WG_IP"; exit 1 ;;
 esac
 
-TS=$(date +%Y%m%d_%H%M%S)
+TS=$(date +%Y%m%d)_${TAG:-$(date +%H%M%S)}
 CSV="$OUT_DIR/${NODE}_${TS}.csv"
 echo "src,dst,ip,port,sent,recv,loss_pct,min_ms,avg_ms,max_ms,stddev_ms,p50_ms,p95_ms" > "$CSV"
 
@@ -125,6 +125,10 @@ PYEOF
     echo "$NODE,$name,$ip,$PORT,$COUNT,$n,$loss,$min,$avg,$max,$sd,$p50,$p95" >> "$CSV"
 
     grep "^RTT" "$TMP" | awk '{print $2}' > /tmp/rtt_data.txt
+
+    # 保存本轮原始 RTT 值（每行一个值），供后续离线分析
+    cp /tmp/rtt_data.txt "$OUT_DIR/${NODE}_${TS}_${name}.raw.csv"
+
     awk -v title="$NODE → $name" '
     { v[++n]=$1 }
     END {
