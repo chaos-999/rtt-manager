@@ -16,7 +16,9 @@
       "listen_port": 51820,
       "dynamic": false,
       "key_dir": "深圳",
-      "role": "gateway"
+      "role": "gateway",
+      "lat": 22.54,
+      "lng": 114.06
     },
     {
       "name": "上海",
@@ -26,7 +28,9 @@
       "listen_port": 51820,
       "dynamic": false,
       "key_dir": "上海",
-      "role": "server"
+      "role": "server",
+      "lat": 31.23,
+      "lng": 121.47
     },
     {
       "name": "杭州",
@@ -36,7 +40,9 @@
       "listen_port": 51820,
       "dynamic": false,
       "key_dir": "杭州",
-      "role": "relay"
+      "role": "relay",
+      "lat": 30.27,
+      "lng": 120.15
     },
     {
       "name": "北京",
@@ -46,7 +52,9 @@
       "listen_port": 51820,
       "dynamic": false,
       "key_dir": "北京",
-      "role": "client"
+      "role": "client",
+      "lat": 39.9,
+      "lng": 116.4
     },
     {
       "name": "成都",
@@ -56,7 +64,9 @@
       "listen_port": 51820,
       "dynamic": false,
       "key_dir": "成都",
-      "role": "relay"
+      "role": "relay",
+      "lat": 30.57,
+      "lng": 104.07
     },
     {
       "name": "青岛",
@@ -66,7 +76,9 @@
       "listen_port": 51820,
       "dynamic": false,
       "key_dir": "青岛",
-      "role": "relay"
+      "role": "relay",
+      "lat": 36.07,
+      "lng": 120.38
     }
   ],
   "edges": [

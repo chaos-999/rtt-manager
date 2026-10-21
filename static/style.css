@@ -74,11 +74,11 @@ pre#log {
 .modal-box input { width: 100%; box-sizing: border-box; font-size: 16px; }
 .modal-actions { display: flex; gap: 12px; justify-content: flex-end; }
 
-.node-edit { display: grid; grid-template-columns: 1fr 1.2fr 1fr 1fr 40px; gap: 8px; margin-bottom: 8px; align-items: center; }
+.node-edit { display: grid; grid-template-columns: 1fr 1.2fr 1fr 1fr 0.7fr 0.7fr 34px; gap: 8px; margin-bottom: 8px; align-items: center; }
 .node-edit input { width: 100%; box-sizing: border-box; }
 .node-edit .del { background: #a33; padding: 6px 0; }
 .node-edit .del:hover { background: #c44; }
-.node-table-head { display: grid; grid-template-columns: 1fr 1.2fr 1fr 1fr 40px; gap: 8px; font-weight: 600; color: #8a93a0; font-size: 14px; padding-bottom: 6px; }
+.node-table-head { display: grid; grid-template-columns: 1fr 1.2fr 1fr 1fr 0.7fr 0.7fr 34px; gap: 8px; font-weight: 600; color: #8a93a0; font-size: 14px; padding-bottom: 6px; }
 
 /* 拓扑编辑器 */
 #topo-modal .modal-box { width: 92vw; height: 92vh; max-height: 92vh; padding: 14px; }
@@ -101,3 +101,10 @@ pre#log {
 #path-bar.hidden { display: none; }
 .path-display { color: #7cb8ff; font-weight: 600; }
 #conf-preview { background: #0f1216; border: 1px solid #2c313a; border-radius: 6px; padding: 14px; font-family: Consolas, monospace; font-size: 13px; white-space: pre-wrap; word-break: break-all; color: #d8dee9; }
+
+/* 数据可视化 */
+#map-modal .modal-box { width: 94vw; height: 94vh; max-height: 94vh; padding: 14px; }
+.map-toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.map-toolbar .hint { color: #8a93a0; font-size: 14px; margin-left: auto; }
+.map-toolbar select { background: #0f1216; border: 1px solid #3a414d; color: #e6e8ec; border-radius: 5px; padding: 7px 9px; font-size: 15px; }
+#map-canvas { flex: 1; background: #14171c; border: 1px solid #2c313a; border-radius: 8px; min-height: 0; }

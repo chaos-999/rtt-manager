@@ -4,6 +4,8 @@
 """
 import os
 import json
+import time
+import shutil
 from concurrent.futures import ThreadPoolExecutor
 from . import ssh
 
@@ -126,6 +128,7 @@ def schedule_task(cfg, start_time, count, selected=None):
         if not key:
             return {"name": n["name"], "ip": n["ip"], "ok": False, "detail": "找不到密钥"}
         cmd = (
+            f"{_remote_clean_cmd()}; "
             f"systemd-run --on-calendar=\"{start_time}\" "
             f"--unit=\"sync-{time_str}-$(date +%s)\" /bin/bash -c "
             f"\"TAG={time_str} /root/tcp_rtt.sh {count} > /root/rtt_results/sync_{time_str}_$(hostname).log 2>&1\""
@@ -340,3 +343,187 @@ def fetch_results(cfg, time_str, selected=None):
         except Exception:
             pass
     return results
+
+
+# ---------------- 本地结果清理 ----------------
+def list_batches(cfg):
+    """列出本地已拉取的测量批次（Meas_* 文件夹）。"""
+    results_dir = cfg.get("results_dir", "")
+    batches = []
+    if results_dir and os.path.isdir(results_dir):
+        for name in os.listdir(results_dir):
+            p = os.path.join(results_dir, name)
+            if name.startswith("Meas_") and os.path.isdir(p):
+                try:
+                    cnt = len([f for f in os.listdir(p) if f.endswith(".csv") and ".raw." not in f])
+                    batches.append({"name": name, "files": cnt, "mtime": os.path.getmtime(p)})
+                except OSError:
+                    continue
+    batches.sort(key=lambda x: x["mtime"], reverse=True)
+    return batches
+
+
+def read_batch_data(cfg, batch):
+    """读取某个批次的摘要 CSV，返回去重后的 src→dst 链路测量数据。"""
+    import csv as csvmod
+    results_dir = cfg.get("results_dir", "")
+    batch_dir = os.path.join(results_dir, batch)
+    if not os.path.isdir(batch_dir):
+        return {"ok": False, "error": "批次不存在"}
+
+    links = {}
+    for fn in os.listdir(batch_dir):
+        if not fn.endswith(".csv") or ".raw." in fn:
+            continue
+        p = os.path.join(batch_dir, fn)
+        try:
+            with open(p, "r", encoding="utf-8", errors="replace") as f:
+                for row in csvmod.DictReader(f):
+                    src = (row.get("src") or "").strip()
+                    dst = (row.get("dst") or "").strip()
+                    if not src or not dst or src == dst:
+                        continue
+                    try:
+                        mn = float(row.get("min_ms") or 0)
+                        avg = float(row.get("avg_ms") or 0)
+                        mx = float(row.get("max_ms") or 0)
+                        sd = float(row.get("stddev_ms") or 0)
+                    except (ValueError, TypeError):
+                        continue
+                    if mn == 0 and avg == 0 and mx == 0:
+                        continue
+                    key = tuple(sorted([src, dst]))
+                    if key not in links:
+                        links[key] = {"src": src, "dst": dst, "min": mn, "avg": avg,
+                                      "max": mx, "stddev": sd}
+        except Exception:
+            continue
+    return {"ok": True, "batch": batch, "links": list(links.values())}
+
+
+def results_stats(cfg, max_count=500, max_days=30):
+    """统计本地结果目录：数量、最早时间、是否触发清理阈值。"""
+    results_dir = cfg.get("results_dir", "")
+    entries = []
+    if results_dir and os.path.isdir(results_dir):
+        for name in os.listdir(results_dir):
+            p = os.path.join(results_dir, name)
+            if name.startswith("Meas_") and os.path.isdir(p):
+                try:
+                    entries.append((os.path.getmtime(p), name))
+                except OSError:
+                    continue
+    count = len(entries)
+    earliest = None
+    exceeds = False
+    if entries:
+        entries.sort(key=lambda x: x[0])
+        earliest = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(entries[0][0]))
+        age_days = (time.time() - entries[0][0]) / 86400.0
+        exceeds = count > max_count or age_days > max_days
+    return {
+        "count": count,
+        "earliest": earliest,
+        "exceeds": exceeds,
+        "max_count": max_count,
+        "max_days": max_days,
+        "results_dir": results_dir,
+    }
+
+
+def clean_local_results(cfg, max_count=500, max_days=30):
+    """清理本地结果目录下的 Meas_* 文件夹。
+
+    规则：按目录修改时间从新到旧，保留最新 max_count 个；
+    超过 max_days 天的也一并删除。返回被删除的文件夹名列表。
+    """
+    results_dir = cfg.get("results_dir", "")
+    if not results_dir or not os.path.isdir(results_dir):
+        return []
+
+    entries = []
+    for name in os.listdir(results_dir):
+        p = os.path.join(results_dir, name)
+        if name.startswith("Meas_") and os.path.isdir(p):
+            try:
+                entries.append((os.path.getmtime(p), name, p))
+            except OSError:
+                continue
+
+    # 按修改时间从新到旧
+    entries.sort(key=lambda x: x[0], reverse=True)
+    now = time.time()
+    removed = []
+    for idx, (mtime, name, p) in enumerate(entries):
+        age_days = (now - mtime) / 86400.0
+        if idx >= max_count or age_days > max_days:
+            try:
+                shutil.rmtree(p)
+                removed.append(name)
+            except Exception:
+                pass
+    return removed
+
+
+# ---------------- 远端结果清理 ----------------
+def _remote_clean_cmd(max_count=500, max_days=30):
+    """生成远端清理 shell 片段：删除 30 天前的 CSV，并保留最新 max_count 个。
+
+    末尾统一带 2>/dev/null || true，确保只读盘/权限异常时彻底静默、绝不失败，
+    不会影响调用方（下发任务、启动清理）的主流程。
+    """
+    return (
+        f"find /root/rtt_results -maxdepth 1 -name '*.csv' -mtime +{max_days} -delete 2>/dev/null || true; "
+        f"ls -1t /root/rtt_results/*.csv 2>/dev/null | tail -n +{max_count + 1} | xargs -r rm -f 2>/dev/null || true"
+    )
+
+
+def clean_remote_results(cfg, selected=None, max_count=500, max_days=30):
+    """并行清理各节点 /root/rtt_results 下的旧 CSV。"""
+    def worker(n):
+        key = find_key(cfg, n)
+        if not key:
+            return {"name": n["name"], "ip": n["ip"], "ok": False, "detail": "找不到密钥"}
+        cmd = _remote_clean_cmd(max_count, max_days) + "; echo CLEAN_OK"
+        code, out, err = ssh.run_ssh(n["ip"], key, cmd)
+        return {"name": n["name"], "ip": n["ip"], "ok": code == 0 and "CLEAN_OK" in out,
+                "detail": (out + err).strip() or "已清理"}
+    return _map_nodes(cfg, selected, worker)
+
+
+def remote_results_stats(cfg, selected=None, max_count=500, max_days=30):
+    """并行统计各节点 /root/rtt_results/*.csv 的数量、最早修改时间、是否超阈值。"""
+    def worker(n):
+        key = find_key(cfg, n)
+        if not key:
+            return {"name": n["name"], "ok": False, "count": 0, "earliest": None,
+                    "age_days": -1, "exceeds": False, "detail": "找不到密钥"}
+        cmd = (
+            "count=$(ls -1 /root/rtt_results/*.csv 2>/dev/null | wc -l | tr -d ' '); "
+            "oldest=$(stat -c '%Y' /root/rtt_results/*.csv 2>/dev/null | sort -n | head -1); "
+            "earliest=$(stat -c '%y' /root/rtt_results/*.csv 2>/dev/null | sort | head -1 | cut -d'.' -f1); "
+            "now=$(date +%s); "
+            "if [ -n \"$oldest\" ]; then age=$(( (now - oldest) / 86400 )); else age=-1; fi; "
+            "echo \"COUNT=$count\"; echo \"EARLIEST=$earliest\"; echo \"AGE_DAYS=$age\""
+        )
+        code, out, err = ssh.run_ssh(n["ip"], key, cmd)
+        d = {"name": n["name"], "ok": code == 0, "count": 0,
+             "earliest": None, "age_days": -1, "detail": (err or "").strip()}
+        if code == 0:
+            for line in out.splitlines():
+                if line.startswith("COUNT="):
+                    try:
+                        d["count"] = int(line[6:].strip())
+                    except ValueError:
+                        pass
+                elif line.startswith("EARLIEST="):
+                    v = line[9:].strip()
+                    d["earliest"] = v or None
+                elif line.startswith("AGE_DAYS="):
+                    try:
+                        d["age_days"] = int(line[9:].strip())
+                    except ValueError:
+                        pass
+        d["exceeds"] = d["count"] > max_count or d["age_days"] > max_days
+        return d
+    return _map_nodes(cfg, selected, worker)

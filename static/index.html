@@ -57,6 +57,14 @@
         <button data-action="fetch-script">生成并分发 tcp_rtt.sh</button>
         <button data-action="deploy-echo">部署 tcp_echo 服务</button>
       </div>
+      <div class="row">
+        <button id="btn-results-check">检测结果数量</button>
+        <span id="results-stats" class="muted"></span>
+      </div>
+      <div class="row">
+        <button id="btn-results-clean" class="ghost" disabled>执行清理</button>
+        <button id="btn-viz">数据可视化</button>
+      </div>
     </section>
 
     <section class="panel">
@@ -80,7 +88,7 @@
 
     <h2>节点列表</h2>
     <div class="node-table-head">
-      <span>名称</span><span>IP</span><span>密钥目录</span><span>角色</span><span></span>
+      <span>名称</span><span>IP</span><span>密钥目录</span><span>角色</span><span>纬度</span><span>经度</span><span></span>
     </div>
     <div id="node-editor"></div>
     <button id="btn-add-node" class="ghost">+ 添加节点</button>
@@ -172,7 +180,24 @@
   </div>
 </div>
 
+<!-- 数据可视化 -->
+<div id="map-modal" class="modal hidden">
+  <div class="modal-box" style="width:94vw; height:94vh; max-height:94vh; padding:14px;">
+    <div class="map-toolbar">
+      <label>数据批次 <select id="viz-batch"></select></label>
+      <button id="btn-viz-gen">生成</button>
+      <button id="btn-viz-zoom-in" class="ghost">放大 +</button>
+      <button id="btn-viz-zoom-out" class="ghost">缩小 -</button>
+      <button id="btn-viz-reset" class="ghost">重置</button>
+      <span class="hint">滚轮缩放 · 拖拽平移 · 圆半径 = 两地物理距离 · 标注 = 本次 RTT</span>
+      <button id="btn-viz-close" class="ghost">关闭</button>
+    </div>
+    <div id="map-canvas"></div>
+  </div>
+</div>
+
 <script src="/static/vendor/cytoscape.min.js"></script>
-<script src="/static/app.js?v=20261022"></script>
+<script src="/static/vendor/echarts.min.js"></script>
+<script src="/static/app.js?v=20261031"></script>
 </body>
 </html>

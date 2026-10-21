@@ -16,6 +16,36 @@ STATIC_DIR = os.path.join(BASE_DIR, "static")
 app = FastAPI(title="蜘蛛网络控制台")
 
 
+@app.on_event("startup")
+def _startup_clean():
+    """程序启动时清理旧结果：本地保留最新 500 个/30 天内；远端后台并行清理。"""
+    try:
+        cfg = tasks.load_config()
+        removed = tasks.clean_local_results(cfg)
+        if removed:
+            import logging
+            logging.getLogger("uvicorn.error").info(
+                "本地结果清理：删除 %d 个旧文件夹", len(removed)
+            )
+    except Exception:
+        pass
+
+    # 远端清理放后台线程，避免节点不可达时拖慢服务启动
+    try:
+        import threading
+        cfg = tasks.load_config()
+
+        def _remote_clean():
+            try:
+                tasks.clean_remote_results(cfg)
+            except Exception:
+                pass
+
+        threading.Thread(target=_remote_clean, daemon=True).start()
+    except Exception:
+        pass
+
+
 class ScheduleBody(BaseModel):
     start_time: str = "15:30:00"
     count: int = 1000
@@ -124,6 +154,37 @@ def api_timers(nodes: Optional[str] = None):
     cfg = tasks.load_config()
     selected = nodes.split(",") if nodes else None
     return {"results": tasks.list_timers(cfg, selected)}
+
+
+@app.get("/api/results/stats")
+def api_results_stats(nodes: Optional[str] = None):
+    cfg = tasks.load_config()
+    selected = nodes.split(",") if nodes else None
+    local = tasks.results_stats(cfg)
+    remote = tasks.remote_results_stats(cfg, selected)
+    exceeds = local["exceeds"] or any(r.get("exceeds") for r in remote)
+    return {"local": local, "remote": remote, "exceeds": exceeds}
+
+
+@app.get("/api/results/batches")
+def api_results_batches():
+    cfg = tasks.load_config()
+    return {"batches": tasks.list_batches(cfg)}
+
+
+@app.get("/api/results/data")
+def api_results_data(batch: str):
+    cfg = tasks.load_config()
+    return tasks.read_batch_data(cfg, batch)
+
+
+@app.post("/api/results/clean")
+def api_results_clean(body: SelectedBody = Body(default=None)):
+    cfg = tasks.load_config()
+    nodes = body.nodes if body else None
+    local_removed = tasks.clean_local_results(cfg)
+    remote = tasks.clean_remote_results(cfg, nodes)
+    return {"local_removed": len(local_removed), "remote": remote}
 
 
 @app.post("/api/tasks/deploy_echo")

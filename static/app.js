@@ -57,6 +57,8 @@ function renderNodeEditor() {
       <input type="text" data-field="ip" value="${n.ip || ''}">
       <input type="text" data-field="key_dir" value="${n.key_dir || ''}">
       <input type="text" data-field="role" value="${n.role || ''}">
+      <input type="text" data-field="lat" value="${n.lat !== undefined ? n.lat : ''}">
+      <input type="text" data-field="lng" value="${n.lng !== undefined ? n.lng : ''}">
       <button class="del" title="删除">×</button>
     `;
     row.querySelector('.del').addEventListener('click', () => {
@@ -91,7 +93,11 @@ function collectConfigForm() {
     const name = get('name'), ip = get('ip');
     if (!name && !ip) return;
     const old = config.nodes[i] || {};
-    newNodes.push({ ...old, name, ip, key_dir: get('key_dir'), role: get('role') });
+    const node = { ...old, name, ip, key_dir: get('key_dir'), role: get('role') };
+    const lat = get('lat'), lng = get('lng');
+    if (lat !== '' && !isNaN(parseFloat(lat))) node.lat = parseFloat(lat); else delete node.lat;
+    if (lng !== '' && !isNaN(parseFloat(lng))) node.lng = parseFloat(lng); else delete node.lng;
+    newNodes.push(node);
   });
   config.nodes = newNodes;
 }
@@ -651,6 +657,266 @@ document.getElementById('conf-preview').addEventListener('keydown', (e) => {
     sel.addRange(range);
   }
 });
+
+// ================= 结果清理（检测 + 手动清理） =================
+document.getElementById('btn-results-check').addEventListener('click', async () => {
+  const el = document.getElementById('results-stats');
+  const cleanBtn = document.getElementById('btn-results-clean');
+  const nodes = selectedNodes();
+  showLoading();
+  try {
+    const url = '/api/results/stats' + (nodes.length ? '?nodes=' + encodeURIComponent(nodes.join(',')) : '');
+    const r = await fetch(url);
+    const d = await r.json();
+    logClear();
+    const L = d.local || {};
+    log(`[本地] 数量=${L.count}  最早=${L.earliest || '无'}`, L.exceeds ? 'warn' : 'ok');
+    (d.remote || []).forEach(x => {
+      if (!x.ok) { log(`[${x.name}] 查询失败: ${x.detail || ''}`, 'fail'); return; }
+      log(`[${x.name}] 数量=${x.count}  最早=${x.earliest || '无'}`, x.exceeds ? 'warn' : 'ok');
+    });
+    log(d.exceeds ? '→ 已触发清理阈值（超过 500 个或超 30 天），清理按钮已激活' : '→ 未触发清理阈值',
+        d.exceeds ? 'warn' : 'ok');
+    cleanBtn.disabled = !d.exceeds;
+    cleanBtn.classList.toggle('active', d.exceeds);
+    el.textContent = d.exceeds ? '检测完成：需要清理' : '检测完成：无需清理';
+    el.style.color = d.exceeds ? '#fbbf24' : '#34d399';
+  } catch (e) {
+    log('检测出错: ' + e.message, 'fail');
+  } finally {
+    hideLoading();
+  }
+});
+
+document.getElementById('btn-results-clean').addEventListener('click', async () => {
+  if (!confirm('确认清理？本地和远端都将保留最新 500 个结果、删除超过 30 天的。')) return;
+  const nodes = selectedNodes();
+  const cleanBtn = document.getElementById('btn-results-clean');
+  const el = document.getElementById('results-stats');
+  cleanBtn.disabled = true;
+  cleanBtn.classList.remove('active');
+  showLoading();
+  try {
+    const r = await fetch('/api/results/clean', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nodes })
+    });
+    const d = await r.json();
+    logClear();
+    log(`本地清理：删除 ${d.local_removed} 个文件夹`, 'ok');
+    (d.remote || []).forEach(x => {
+      log(`[远端 ${x.name}] ${x.ok ? '成功' : '失败'}: ${x.detail}`, x.ok ? 'ok' : 'fail');
+    });
+    log('--- 清理完成 ---', 'warn');
+  } catch (e) {
+    log('清理出错: ' + e.message, 'fail');
+  } finally {
+    hideLoading();
+  }
+  // 清理后自动重新检测
+  document.getElementById('btn-results-check').click();
+});
+
+// ================= 数据可视化（中国地图 + 测距同心圆） =================
+let mapChart = null;
+const CITY_COORDS = {
+  '北京': [116.40, 39.90],
+  '上海': [121.47, 31.23],
+  '深圳': [114.06, 22.54],
+  '杭州': [120.15, 30.27],
+  '成都': [104.07, 30.57],
+  '青岛': [120.38, 36.07]
+};
+
+function coordsOf(name) {
+  if (CITY_COORDS[name]) return CITY_COORDS[name];
+  const n = ((config && config.nodes) || []).find(x => x.name === name);
+  if (n && n.lng !== undefined && n.lat !== undefined) return [Number(n.lng), Number(n.lat)];
+  return null;
+}
+
+function haversineM(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const rlat1 = lat1 * Math.PI / 180, rlat2 = lat2 * Math.PI / 180;
+  const dlat = (lat2 - lat1) * Math.PI / 180;
+  const dlng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dlat / 2) ** 2 + Math.cos(rlat1) * Math.cos(rlat2) * Math.sin(dlng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+function destPoint(lat, lng, bearingDeg, distM) {
+  const R = 6371000;
+  const d = distM / R;
+  const brng = bearingDeg * Math.PI / 180;
+  const rlat1 = lat * Math.PI / 180, rlng1 = lng * Math.PI / 180;
+  const rlat2 = Math.asin(Math.sin(rlat1) * Math.cos(d) + Math.cos(rlat1) * Math.sin(d) * Math.cos(brng));
+  const rlng2 = rlng1 + Math.atan2(Math.sin(brng) * Math.sin(d) * Math.cos(rlat1),
+                                   Math.cos(d) - Math.sin(rlat1) * Math.sin(rlat2));
+  return [rlng2 * 180 / Math.PI, rlat2 * 180 / Math.PI];
+}
+
+function circleCoords(lat, lng, radiusM, segs) {
+  segs = segs || 72;
+  const pts = [];
+  for (let i = 0; i <= segs; i++) {
+    pts.push(destPoint(lat, lng, i * 360 / segs, radiusM));
+  }
+  return pts;
+}
+
+async function openViz() {
+  document.getElementById('map-modal').classList.remove('hidden');
+  const r = await fetch('/api/results/batches');
+  const d = await r.json();
+  const sel = document.getElementById('viz-batch');
+  sel.innerHTML = '';
+  (d.batches || []).forEach(b => {
+    const o = document.createElement('option');
+    o.value = b.name;
+    o.textContent = `${b.name}（${b.files} CSV）`;
+    sel.appendChild(o);
+  });
+  if (!mapChart) {
+    mapChart = echarts.init(document.getElementById('map-canvas'));
+    window.addEventListener('resize', () => { if (mapChart) mapChart.resize(); });
+  }
+  mapChart.resize();
+}
+
+async function genViz() {
+  const batch = document.getElementById('viz-batch').value;
+  if (!batch) { alert('请选择数据批次'); return; }
+  showLoading();
+  try {
+    if (!window.__mapRegistered) {
+      const geo = await fetch('/static/vendor/china.json').then(x => x.json());
+      echarts.registerMap('china', geo);
+      window.__mapRegistered = true;
+    }
+    const r = await fetch('/api/results/data?batch=' + encodeURIComponent(batch));
+    const d = await r.json();
+    if (!d.ok) { alert(d.error || '读取失败'); return; }
+
+    const nodeData = {};
+    const circleSeries = [];
+    const linkSeries = [];
+    const labelData = [];
+    const missing = new Set();
+
+    // 1. 画出所有拓扑节点（没有测量数据也画点）
+    for (const n of ((config && config.nodes) || [])) {
+      const c = coordsOf(n.name);
+      if (c) nodeData[n.name] = c;
+      else missing.add(n.name);
+    }
+
+    // 2. 对每条有数据的链路：双方各以自己为圆心、A-B 物理距离为半径画圆，
+    //    标注包含 谁-谁、avg 与 ±3σ 区间（3-sigma 原则）
+    const LINK_COLORS = ['#4dd0ff', '#ff9f5c', '#7cff9b', '#c084fc',
+                         '#ffd84d', '#ff6b9d', '#5cffd6', '#a0e7ff'];
+    let colorIdx = 0;
+    for (const l of d.links) {
+      const a = coordsOf(l.src), b = coordsOf(l.dst);
+      if (!a || !b) continue;
+      const color = LINK_COLORS[colorIdx % LINK_COLORS.length];
+      colorIdx++;
+      const dist = haversineM(a[1], a[0], b[1], b[0]);
+      const lo = Math.max(0, l.avg - 3 * (l.stddev || 0));
+      const hi = l.avg + 3 * (l.stddev || 0);
+      const text = `${l.src}-${l.dst} avg=${l.avg.toFixed(1)}ms [${lo.toFixed(1)}~${hi.toFixed(1)}]`;
+
+      const info = { src: l.src, dst: l.dst, avg: l.avg, lo, hi };
+
+      // 以 A 为圆心
+      circleSeries.push({ coords: circleCoords(a[1], a[0], dist, 360),
+                          lineStyle: { color }, name: `${l.src} ⇄ ${l.dst}`, info });
+      labelData.push({ value: destPoint(a[1], a[0], 0, dist),
+                       label: { formatter: text, color },
+                       name: `${l.src} ⇄ ${l.dst}`, info });
+
+      // 以 B 为圆心（同一段链路，双方各画一圈）
+      circleSeries.push({ coords: circleCoords(b[1], b[0], dist, 360),
+                          lineStyle: { color }, name: `${l.src} ⇄ ${l.dst}`, info });
+      labelData.push({ value: destPoint(b[1], b[0], 0, dist),
+                       label: { formatter: text, color },
+                       name: `${l.src} ⇄ ${l.dst}`, info });
+
+      // 节点间连线（虚线，仅表示连接关系，不模拟真实路由）
+      linkSeries.push({ coords: [a, b], lineStyle: { color } });
+    }
+
+    mapChart.setOption({
+      backgroundColor: 'transparent',
+      tooltip: {
+        trigger: 'item',
+        formatter: p => {
+          const d = p.data;
+          if (d && d.info) {
+            const i = d.info;
+            return `<b>${i.src} ⇄ ${i.dst}</b><br/>avg = ${i.avg.toFixed(2)} ms<br/>3σ = ${i.lo.toFixed(2)} ~ ${i.hi.toFixed(2)} ms`;
+          }
+          return p.name || '';
+        }
+      },
+      geo: {
+        map: 'china', roam: true, zoom: 1.2,
+        itemStyle: { areaColor: '#1e2229', borderColor: '#3a414d' },
+        emphasis: { itemStyle: { areaColor: '#2a2f3a' }, label: { show: false } },
+        label: { show: false }
+      },
+      series: [
+        {
+          type: 'lines', coordinateSystem: 'geo', polyline: false, silent: true,
+          lineStyle: { color: '#22d3ee', width: 2, opacity: 0.9, type: 'dashed' },
+          data: linkSeries
+        },
+        {
+          type: 'lines', coordinateSystem: 'geo', polyline: true,
+          lineStyle: { width: 2, opacity: 0.8 },
+          emphasis: { lineStyle: { width: 4, opacity: 1 } },
+          data: circleSeries
+        },
+        {
+          type: 'scatter', coordinateSystem: 'geo', symbolSize: 11,
+          itemStyle: { color: '#f59e0b', borderColor: '#fff', borderWidth: 1 },
+          label: { show: true, formatter: '{b}', position: 'right', color: '#fff', fontSize: 13 },
+          data: Object.entries(nodeData).map(([name, c]) => ({ name, value: c }))
+        },
+        {
+          type: 'scatter', coordinateSystem: 'geo', symbolSize: 18,
+          itemStyle: { color: 'rgba(0,0,0,0)' },
+          emphasis: { label: { fontSize: 14 } },
+          label: { show: true, color: '#fde047', fontSize: 12, position: 'top' },
+          data: labelData
+        }
+      ]
+    }, true);
+
+    logClear();
+    log(`生成可视化：${batch}，共 ${d.links.length} 条链路`, 'ok');
+    if (missing.size) {
+      log(`未找到坐标的节点（已跳过）：${[...missing].join('、')}`, 'warn');
+    }
+  } finally {
+    hideLoading();
+  }
+}
+
+function vizZoom(delta) {
+  if (!mapChart) return;
+  const opt = mapChart.getOption();
+  const cur = (opt.geo && opt.geo[0] && opt.geo[0].zoom) || 1.2;
+  mapChart.setOption({ geo: { zoom: Math.max(0.3, Math.min(8, cur + delta)) } });
+}
+
+document.getElementById('btn-viz').addEventListener('click', openViz);
+document.getElementById('btn-viz-close').addEventListener('click', () => {
+  document.getElementById('map-modal').classList.add('hidden');
+});
+document.getElementById('btn-viz-gen').addEventListener('click', genViz);
+document.getElementById('btn-viz-zoom-in').addEventListener('click', () => vizZoom(0.3));
+document.getElementById('btn-viz-zoom-out').addEventListener('click', () => vizZoom(-0.3));
+document.getElementById('btn-viz-reset').addEventListener('click', () => genViz());
 
 // 节点属性弹窗
 document.getElementById('btn-np-save').addEventListener('click', saveNodeProps);
