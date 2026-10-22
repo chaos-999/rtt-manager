@@ -40,7 +40,7 @@ function renderNodes() {
   list.innerHTML = '';
   (config.nodes || []).forEach(n => {
     const li = document.createElement('li');
-    li.innerHTML = `<input type="checkbox" data-name="${n.name}" checked> <span>${n.name}</span> <span class="ip">${n.ip || ''}</span>`;
+    li.innerHTML = `<input type="checkbox" data-name="${n.name}" checked> <span class="node-dot" style="background:${roleColor(n.role)}"></span> <span>${n.name}</span> <span class="ip">${n.ip || ''}</span>`;
     list.appendChild(li);
   });
 }
@@ -959,7 +959,136 @@ document.getElementById('viz-check-all').addEventListener('change', (e) => {
   document.querySelectorAll('#viz-node-list input[type=checkbox]').forEach(b => b.checked = e.target.checked);
   renderViz();
 });
-// ================= 全互联部署（O(n^2) 两两直连） =================
+// ================= 多定时任务（时钟转盘 + 批量下发） =================
+let scheduledTimes = [];
+
+function renderTimeList() {
+  const ul = document.getElementById('time-list');
+  ul.innerHTML = '';
+  scheduledTimes.forEach((t, i) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<span>${t}</span><button class="del" title="删除">×</button>`;
+    li.querySelector('.del').addEventListener('click', () => {
+      scheduledTimes.splice(i, 1);
+      renderTimeList();
+    });
+    ul.appendChild(li);
+  });
+}
+
+const CLOCK_ITEM_H = 36;
+
+function buildClockColumn(el, max) {
+  el.innerHTML = '';
+  const padTop = document.createElement('div');
+  padTop.className = 'clock-pad';
+  el.appendChild(padTop);
+  for (let i = 0; i <= max; i++) {
+    const d = document.createElement('div');
+    d.className = 'clock-item';
+    d.dataset.val = i;
+    d.textContent = String(i).padStart(2, '0');
+    d.addEventListener('click', () => el.scrollTo({ top: i * CLOCK_ITEM_H, behavior: 'smooth' }));
+    el.appendChild(d);
+  }
+  const padBot = document.createElement('div');
+  padBot.className = 'clock-pad';
+  el.appendChild(padBot);
+}
+
+function clockIndex(el) {
+  return Math.round(el.scrollTop / CLOCK_ITEM_H);
+}
+
+function clockValue(el) {
+  const maxIdx = el.querySelectorAll('.clock-item').length - 1;
+  const idx = Math.max(0, Math.min(clockIndex(el), maxIdx));
+  return String(idx).padStart(2, '0');
+}
+
+function updateClockPreview() {
+  const h = clockValue(document.getElementById('clock-h'));
+  const m = clockValue(document.getElementById('clock-m'));
+  const s = clockValue(document.getElementById('clock-s'));
+  document.getElementById('clock-preview').textContent = `${h}:${m}:${s}`;
+}
+
+function bindClockScroll(el) {
+  el.addEventListener('scroll', () => {
+    const idx = clockIndex(el);
+    el.querySelectorAll('.clock-item').forEach((it, i) => it.classList.toggle('active', i === idx));
+    updateClockPreview();
+  });
+}
+
+let clockInited = false;
+function openClock() {
+  const hEl = document.getElementById('clock-h');
+  const mEl = document.getElementById('clock-m');
+  const sEl = document.getElementById('clock-s');
+  if (!clockInited) {
+    buildClockColumn(hEl, 23);
+    buildClockColumn(mEl, 59);
+    buildClockColumn(sEl, 59);
+    bindClockScroll(hEl);
+    bindClockScroll(mEl);
+    bindClockScroll(sEl);
+    clockInited = true;
+  }
+  const now = new Date(Date.now() + 60000);
+  hEl.scrollTop = now.getHours() * CLOCK_ITEM_H;
+  mEl.scrollTop = now.getMinutes() * CLOCK_ITEM_H;
+  sEl.scrollTop = now.getSeconds() * CLOCK_ITEM_H;
+  [hEl, mEl, sEl].forEach(e => e.dispatchEvent(new Event('scroll')));
+  document.getElementById('clock-modal').classList.remove('hidden');
+}
+
+document.getElementById('btn-add-time').addEventListener('click', openClock);
+document.getElementById('btn-clock-cancel').addEventListener('click', () => {
+  document.getElementById('clock-modal').classList.add('hidden');
+});
+document.getElementById('btn-clock-ok').addEventListener('click', () => {
+  const h = clockValue(document.getElementById('clock-h'));
+  const m = clockValue(document.getElementById('clock-m'));
+  const s = clockValue(document.getElementById('clock-s'));
+  const t = `${h}:${m}:${s}`;
+  if (!scheduledTimes.includes(t)) {
+    scheduledTimes.push(t);
+    scheduledTimes.sort();
+    renderTimeList();
+  }
+  document.getElementById('clock-modal').classList.add('hidden');
+});
+
+document.getElementById('btn-schedule-batch').addEventListener('click', async () => {
+  if (!scheduledTimes.length) { alert('请先添加至少一个定时'); return; }
+  const count = parseInt(document.getElementById('count').value) || 1000;
+  const nodes = selectedNodes();
+  if (!confirm(`将向 ${nodes.length ? nodes.length + ' 个' : '全部'}节点下发 ${scheduledTimes.length} 个定时任务：\n${scheduledTimes.join('、')}\n\n次数：${count}`)) return;
+  showLoading();
+  logClear();
+  log(`批量下发 ${scheduledTimes.length} 个定时，次数=${count}`, 'warn');
+  try {
+    for (const t of scheduledTimes) {
+      log(`\n[${t}]`, 'warn');
+      const r = await fetch('/api/tasks/schedule', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ start_time: t, count, nodes })
+      });
+      const d = await r.json();
+      (d.results || []).forEach(x => {
+        log(`  ${x.name}: ${x.ok ? '成功' : '失败'}`, x.ok ? 'ok' : 'fail');
+      });
+    }
+    log('\n--- 批量下发完成 ---', 'warn');
+  } catch (e) {
+    log('下发出错: ' + e.message, 'fail');
+  } finally {
+    hideLoading();
+  }
+});
+
+// 全互联部署（O(n^2) 两两直连）
 document.getElementById('btn-mesh-deploy').addEventListener('click', async () => {
   const nodes = selectedNodes();
   if (nodes.length < 2) { alert('请至少勾选 2 个节点'); return; }

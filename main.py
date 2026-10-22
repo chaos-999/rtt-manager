@@ -9,8 +9,9 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional, List
 from core import tasks, wgconf, tcp_rtt, mesh
+from core.paths import res_dir
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = res_dir()
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 
 app = FastAPI(title="蜘蛛网络控制台")

@@ -2,3 +2,7 @@ __pycache__/
 *.pyc
 logs/
 conf_snapshot/
+dist/
+build/
+.venv-build/
+*.spec

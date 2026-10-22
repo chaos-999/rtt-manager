@@ -21,8 +21,9 @@ from concurrent.futures import ThreadPoolExecutor
 
 from . import ssh
 from .tasks import find_key
+from .paths import app_dir
 
-CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.json")
+CONFIG_PATH = os.path.join(app_dir(), "config.json")
 
 MTU = 1380
 DEFAULT_PORT = 51820

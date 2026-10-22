@@ -279,3 +279,36 @@ rtt-manager/
 - **数据可视化坐标**：新增节点若不在内置 6 城内，需在配置页填写 `lat`/`lng`，否则地图上会被跳过。
 - **地图投影**：等时延圆按球面物理距离生成，在地图（墨卡托投影）上会随纬度轻微变形，属正常现象。
 - **手改中文文件**：不要用 PowerShell 的 `Get-Content | Set-Content` 改 `static/` 下的中文文件（PS 5.1 会用 GBK 误读导致乱码），请用 UTF-8 无 BOM 编辑器。
+
+
+---
+
+## 十、打包为免安装绿色版
+
+项目可打包成**免安装绿色版**：目标机器无需安装 Python 和任何依赖，解压即用。
+
+### 打包
+
+双击 uild.bat（自动创建独立构建环境并调用 PyInstaller）。
+
+- 产物：dist\rtt-manager\ 整个文件夹
+- 双击其中的 
+tt-manager.exe 即后台运行（系统托盘）
+- 体积约 45 MB
+
+### 目标机器要求
+
+- Windows 10/11
+- **OpenSSH Client**（多数系统自带；如无，在「设置 → 应用 → 可选功能」中启用）
+- 无需安装 Python / pip
+
+### 首次运行
+
+在 exe 所在目录自动生成 config.json（来自内置 config.default.json 模板）与 logs/。
+首次启动会弹出设置向导（密钥目录 / 结果目录 / 管理员密码）。
+
+### 说明
+
+- uild.bat 会从打包机的 Python 安装目录自动定位 fi.dll、fi-8.dll、libcrypto-3-x64.dll、libssl-3-x64.dll 一并打包（这些是 _ctypes 与 _ssl 的依赖，缺失会导致启动失败）。
+- 打包机需能创建 venv 并联网安装依赖（首次运行 uild.bat 时）。
+- 迁移打包机时，把 python_path.txt 指向该机的 python.exe 即可。

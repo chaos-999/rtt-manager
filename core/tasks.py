@@ -8,11 +8,33 @@ import time
 import shutil
 from concurrent.futures import ThreadPoolExecutor
 from . import ssh
+from .paths import app_dir, res_dir
 
-CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.json")
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BASE_DIR = app_dir()
+CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
 # 管理员密码存放位置：logs 目录下的隐藏文件（明文，隐蔽存储）
 PWD_PATH = os.path.join(BASE_DIR, "logs", ".admin_pwd")
+
+
+def _ensure_config_file():
+    """首次运行（打包后常见）时，从内置模板生成 config.json。"""
+    if os.path.isfile(CONFIG_PATH):
+        return
+    tpl = os.path.join(res_dir(), "config.default.json")
+    if os.path.isfile(tpl):
+        try:
+            shutil.copy(tpl, CONFIG_PATH)
+            return
+        except Exception:
+            pass
+    # 兜底：写一个最小可用配置
+    minimal = {
+        "start_first": True, "key_base": "", "results_dir": "",
+        "defaults": {"count": 1000, "time": "15:30:00"},
+        "nodes": [], "edges": [], "active_edges": [],
+    }
+    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+        json.dump(minimal, f, ensure_ascii=False, indent=2)
 
 
 def _map_nodes(cfg, selected, worker):
@@ -55,6 +77,7 @@ def mark_started():
 
 
 def load_config():
+    _ensure_config_file()
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
         return json.load(f)
 

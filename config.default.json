@@ -1,0 +1,12 @@
+{
+  "start_first": true,
+  "key_base": "",
+  "results_dir": "",
+  "defaults": {
+    "count": 1000,
+    "time": "15:30:00"
+  },
+  "nodes": [],
+  "edges": [],
+  "active_edges": []
+}

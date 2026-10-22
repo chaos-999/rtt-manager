@@ -14,8 +14,9 @@ from PIL import Image, ImageDraw
 
 import uvicorn
 from main import app
+from core.paths import app_dir
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = app_dir()
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 HOST = "127.0.0.1"

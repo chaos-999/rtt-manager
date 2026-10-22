@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>蜘蛛网络控制台</title>
-<link rel="stylesheet" href="/static/style.css?v=20261105">
+<link rel="stylesheet" href="/static/style.css?v=20261109">
 </head>
 <body>
 <header>
@@ -34,18 +34,27 @@
     </section>
 
     <section class="panel">
-      <h2>下发测量任务</h2>
-      <div class="row">
-        <label>时间 <input type="text" id="start-time" value="15:30:00" placeholder="HH:mm:ss"></label>
-        <label>次数 <input type="number" id="count" value="1000" min="1"></label>
-      </div>
-      <div class="row">
-        <button data-action="schedule">下发定时任务</button>
-        <button data-action="clean">清理定时器</button>
-        <button data-action="list-timers">获取定时任务列表</button>
-      </div>
+      <h2>拓扑部署</h2>
       <div class="row">
         <button id="btn-mesh-deploy">全互联部署（两两直连）</button>
+        <span class="muted small">将选中节点两两点对点直连，并把 active_edges 置为完全图</span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>下发测量任务</h2>
+      <div class="time-list-head">
+        <span>定时列表</span>
+        <button id="btn-add-time" class="ghost small">+ 添加定时</button>
+      </div>
+      <ul id="time-list" class="time-list"></ul>
+      <div class="row">
+        <label>次数 <input type="number" id="count" value="1000" min="1"></label>
+        <button id="btn-schedule-batch">批量下发</button>
+      </div>
+      <div class="row panel-actions">
+        <button data-action="clean" class="ghost">清理定时器</button>
+        <button data-action="list-timers" class="ghost">获取定时任务列表</button>
       </div>
     </section>
 
@@ -208,8 +217,27 @@
   </div>
 </div>
 
+<!-- 时钟转盘选择定时 -->
+<div id="clock-modal" class="modal hidden">
+  <div class="modal-box" style="width:340px;">
+    <h2>选择定时</h2>
+    <div class="clock">
+      <div class="clock-col-wrap"><div class="clock-col" id="clock-h"></div></div>
+      <div class="clock-sep">:</div>
+      <div class="clock-col-wrap"><div class="clock-col" id="clock-m"></div></div>
+      <div class="clock-sep">:</div>
+      <div class="clock-col-wrap"><div class="clock-col" id="clock-s"></div></div>
+    </div>
+    <div class="clock-preview" id="clock-preview">15:30:00</div>
+    <div class="modal-actions">
+      <button id="btn-clock-ok">确定添加</button>
+      <button id="btn-clock-cancel" class="ghost">取消</button>
+    </div>
+  </div>
+</div>
+
 <script src="/static/vendor/cytoscape.min.js"></script>
 <script src="/static/vendor/echarts.min.js"></script>
-<script src="/static/app.js?v=20261109"></script>
+<script src="/static/app.js?v=20261112"></script>
 </body>
 </html>
