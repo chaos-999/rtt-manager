@@ -776,11 +776,44 @@ async function openViz() {
     o.textContent = `${b.name}（${b.files} CSV）`;
     sel.appendChild(o);
   });
+  renderVizNodeList();
   if (!mapChart) {
     mapChart = echarts.init(document.getElementById('map-canvas'));
     window.addEventListener('resize', () => { if (mapChart) mapChart.resize(); });
   }
   mapChart.resize();
+}
+
+let lastVizData = null;  // { batch, nodeData, links, missing }
+
+function renderVizNodeList() {
+  const ul = document.getElementById('viz-node-list');
+  // 保留上次的勾选状态；首次打开（无旧项）默认全选
+  const prev = {};
+  ul.querySelectorAll('input[type=checkbox]').forEach(b => { prev[b.dataset.name] = b.checked; });
+  ul.innerHTML = '';
+  for (const n of ((config && config.nodes) || [])) {
+    const checked = (n.name in prev) ? prev[n.name] : true;
+    const li = document.createElement('li');
+    li.innerHTML = `<input type="checkbox" data-name="${n.name}" ${checked ? 'checked' : ''}> <span>${n.name}</span>`;
+    li.querySelector('input').addEventListener('change', () => { syncVizCheckAll(); renderViz(); });
+    ul.appendChild(li);
+  }
+  syncVizCheckAll();
+}
+
+function syncVizCheckAll() {
+  const boxes = document.querySelectorAll('#viz-node-list input[type=checkbox]');
+  const all = boxes.length > 0 && Array.from(boxes).every(b => b.checked);
+  document.getElementById('viz-check-all').checked = all;
+}
+
+function selectedVizCenters() {
+  const s = new Set();
+  document.querySelectorAll('#viz-node-list input[type=checkbox]').forEach(b => {
+    if (b.checked) s.add(b.dataset.name);
+  });
+  return s;
 }
 
 async function genViz() {
@@ -798,108 +831,112 @@ async function genViz() {
     if (!d.ok) { alert(d.error || '读取失败'); return; }
 
     const nodeData = {};
-    const circleSeries = [];
-    const linkSeries = [];
-    const labelData = [];
     const missing = new Set();
-
-    // 1. 画出所有拓扑节点（没有测量数据也画点）
     for (const n of ((config && config.nodes) || [])) {
       const c = coordsOf(n.name);
       if (c) nodeData[n.name] = c;
       else missing.add(n.name);
     }
+    lastVizData = { batch, nodeData, links: d.links || [], missing };
+    renderViz();
 
-    // 2. 对每条有数据的链路：双方各以自己为圆心、A-B 物理距离为半径画圆，
-    //    标注包含 谁-谁、avg 与 ±3σ 区间（3-sigma 原则）
-    const LINK_COLORS = ['#4dd0ff', '#ff9f5c', '#7cff9b', '#c084fc',
-                         '#ffd84d', '#ff6b9d', '#5cffd6', '#a0e7ff'];
-    let colorIdx = 0;
-    for (const l of d.links) {
-      const a = coordsOf(l.src), b = coordsOf(l.dst);
-      if (!a || !b) continue;
-      const color = LINK_COLORS[colorIdx % LINK_COLORS.length];
-      colorIdx++;
-      const dist = haversineM(a[1], a[0], b[1], b[0]);
-      const lo = Math.max(0, l.avg - 3 * (l.stddev || 0));
-      const hi = l.avg + 3 * (l.stddev || 0);
-      const text = `${l.src}-${l.dst} avg=${l.avg.toFixed(1)}ms [${lo.toFixed(1)}~${hi.toFixed(1)}]`;
+    logClear();
+    log(`生成可视化：${batch}，共 ${(d.links || []).length} 条链路`, 'ok');
+    if (missing.size) log(`未找到坐标的节点（已跳过）：${[...missing].join('、')}`, 'warn');
+  } finally {
+    hideLoading();
+  }
+}
 
-      const info = { src: l.src, dst: l.dst, avg: l.avg, lo, hi };
+function renderViz() {
+  if (!lastVizData || !mapChart) return;
+  const { nodeData, links } = lastVizData;
+  const centers = selectedVizCenters();  // 勾选为参考节点的集合（只有它们才画圆）
 
-      // 以 A 为圆心
+  const circleSeries = [];
+  const linkSeries = [];
+  const labelData = [];
+  const LINK_COLORS = ['#4dd0ff', '#ff9f5c', '#7cff9b', '#c084fc',
+                       '#ffd84d', '#ff6b9d', '#5cffd6', '#a0e7ff'];
+  let colorIdx = 0;
+
+  for (const l of links) {
+    const a = coordsOf(l.src), b = coordsOf(l.dst);
+    if (!a || !b) continue;
+    const color = LINK_COLORS[colorIdx % LINK_COLORS.length];
+    colorIdx++;
+    const dist = haversineM(a[1], a[0], b[1], b[0]);
+    const lo = Math.max(0, l.avg - 3 * (l.stddev || 0));
+    const hi = l.avg + 3 * (l.stddev || 0);
+    const text = `${l.src}-${l.dst} avg=${l.avg.toFixed(1)}ms [${lo.toFixed(1)}~${hi.toFixed(1)}]`;
+    const info = { src: l.src, dst: l.dst, avg: l.avg, lo, hi };
+
+    // 节点间连线（始终显示）
+    linkSeries.push({ coords: [a, b], lineStyle: { color } });
+
+    // 只画「被勾选为参考节点」为圆心的圆
+    if (centers.has(l.src)) {
       circleSeries.push({ coords: circleCoords(a[1], a[0], dist, 360),
                           lineStyle: { color }, name: `${l.src} ⇄ ${l.dst}`, info });
       labelData.push({ value: destPoint(a[1], a[0], 0, dist),
                        label: { formatter: text, color },
                        name: `${l.src} ⇄ ${l.dst}`, info });
-
-      // 以 B 为圆心（同一段链路，双方各画一圈）
+    }
+    if (centers.has(l.dst)) {
       circleSeries.push({ coords: circleCoords(b[1], b[0], dist, 360),
                           lineStyle: { color }, name: `${l.src} ⇄ ${l.dst}`, info });
       labelData.push({ value: destPoint(b[1], b[0], 0, dist),
                        label: { formatter: text, color },
                        name: `${l.src} ⇄ ${l.dst}`, info });
-
-      // 节点间连线（虚线，仅表示连接关系，不模拟真实路由）
-      linkSeries.push({ coords: [a, b], lineStyle: { color } });
     }
-
-    mapChart.setOption({
-      backgroundColor: 'transparent',
-      tooltip: {
-        trigger: 'item',
-        formatter: p => {
-          const d = p.data;
-          if (d && d.info) {
-            const i = d.info;
-            return `<b>${i.src} ⇄ ${i.dst}</b><br/>avg = ${i.avg.toFixed(2)} ms<br/>3σ = ${i.lo.toFixed(2)} ~ ${i.hi.toFixed(2)} ms`;
-          }
-          return p.name || '';
-        }
-      },
-      geo: {
-        map: 'china', roam: true, zoom: 1.2,
-        itemStyle: { areaColor: '#1e2229', borderColor: '#3a414d' },
-        emphasis: { itemStyle: { areaColor: '#2a2f3a' }, label: { show: false } },
-        label: { show: false }
-      },
-      series: [
-        {
-          type: 'lines', coordinateSystem: 'geo', polyline: false, silent: true,
-          lineStyle: { color: '#22d3ee', width: 2, opacity: 0.9, type: 'dashed' },
-          data: linkSeries
-        },
-        {
-          type: 'lines', coordinateSystem: 'geo', polyline: true,
-          lineStyle: { width: 2, opacity: 0.8 },
-          emphasis: { lineStyle: { width: 4, opacity: 1 } },
-          data: circleSeries
-        },
-        {
-          type: 'scatter', coordinateSystem: 'geo', symbolSize: 11,
-          itemStyle: { color: '#f59e0b', borderColor: '#fff', borderWidth: 1 },
-          label: { show: true, formatter: '{b}', position: 'right', color: '#fff', fontSize: 13 },
-          data: Object.entries(nodeData).map(([name, c]) => ({ name, value: c }))
-        },
-        {
-          type: 'scatter', coordinateSystem: 'geo', symbolSize: 18,
-          itemStyle: { color: 'rgba(0,0,0,0)' },
-          emphasis: { label: { fontSize: 14 } },
-          label: { show: true, color: '#fde047', fontSize: 12, position: 'top' },
-          data: labelData
-        }
-      ]
-    }, true);
-
-    logClear();
-    log(`生成可视化：${batch}，共 ${d.links.length} 条链路`, 'ok');
-    if (missing.size) {
-      log(`未找到坐标的节点（已跳过）：${[...missing].join('、')}`, 'warn');
-    }
-  } finally {
-    hideLoading();
   }
+
+  mapChart.setOption({
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'item',
+      formatter: p => {
+        const dd = p.data;
+        if (dd && dd.info) {
+          const i = dd.info;
+          return `<b>${i.src} ⇄ ${i.dst}</b><br/>avg = ${i.avg.toFixed(2)} ms<br/>3σ = ${i.lo.toFixed(2)} ~ ${i.hi.toFixed(2)} ms`;
+        }
+        return p.name || '';
+      }
+    },
+    geo: {
+      map: 'china', roam: true, zoom: 1.2,
+      itemStyle: { areaColor: '#1e2229', borderColor: '#3a414d' },
+      emphasis: { itemStyle: { areaColor: '#2a2f3a' }, label: { show: false } },
+      label: { show: false }
+    },
+    series: [
+      {
+        type: 'lines', coordinateSystem: 'geo', polyline: false, silent: true,
+        lineStyle: { color: '#22d3ee', width: 2, opacity: 0.9, type: 'dashed' },
+        data: linkSeries
+      },
+      {
+        type: 'lines', coordinateSystem: 'geo', polyline: true,
+        lineStyle: { width: 2, opacity: 0.8 },
+        emphasis: { lineStyle: { width: 4, opacity: 1 } },
+        data: circleSeries
+      },
+      {
+        type: 'scatter', coordinateSystem: 'geo', symbolSize: 11,
+        itemStyle: { color: '#f59e0b', borderColor: '#fff', borderWidth: 1 },
+        label: { show: true, formatter: '{b}', position: 'right', color: '#fff', fontSize: 13 },
+        data: Object.entries(nodeData).map(([name, c]) => ({ name, value: c }))
+      },
+      {
+        type: 'scatter', coordinateSystem: 'geo', symbolSize: 10,
+        itemStyle: { color: 'rgba(0,0,0,0)' },
+        emphasis: { label: { fontSize: 14 } },
+        label: { show: true, color: '#fde047', fontSize: 12, position: 'top' },
+        data: labelData
+      }
+    ]
+  }, true);
 }
 
 function vizZoom(delta) {
@@ -917,6 +954,40 @@ document.getElementById('btn-viz-gen').addEventListener('click', genViz);
 document.getElementById('btn-viz-zoom-in').addEventListener('click', () => vizZoom(0.3));
 document.getElementById('btn-viz-zoom-out').addEventListener('click', () => vizZoom(-0.3));
 document.getElementById('btn-viz-reset').addEventListener('click', () => genViz());
+
+document.getElementById('viz-check-all').addEventListener('change', (e) => {
+  document.querySelectorAll('#viz-node-list input[type=checkbox]').forEach(b => b.checked = e.target.checked);
+  renderViz();
+});
+// ================= 全互联部署（O(n^2) 两两直连） =================
+document.getElementById('btn-mesh-deploy').addEventListener('click', async () => {
+  const nodes = selectedNodes();
+  if (nodes.length < 2) { alert('请至少勾选 2 个节点'); return; }
+  if (!confirm(`将把勾选的 ${nodes.length} 个节点部署为全互联（每对点对点直连），\n覆盖它们的 wg0.conf，并把 active_edges 置为完全图。\n\n确认继续？`)) return;
+  showLoading();
+  try {
+    const r = await fetch('/api/mesh/deploy', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nodes })
+    });
+    const d = await r.json();
+    logClear();
+    if (!d.ok) { log('全互联部署失败: ' + (d.error || ''), 'fail'); return; }
+    log('全互联部署完成：', 'ok');
+    (d.results || []).forEach(x => {
+      log(`[${x.name}] ${x.ok ? '成功' : '失败'}`, x.ok ? 'ok' : 'fail');
+      (x.steps || []).forEach(s => {
+        if (!s.ok) log(`    ${s.name}: ${s.output || ''}`, 'fail');
+      });
+    });
+    log(`active_edges 已置为完全图（${(d.active_edges || []).length} 条边）`, 'ok');
+    log('下一步：点「生成并分发 tcp_rtt.sh」→「下发定时任务」', 'warn');
+  } catch (e) {
+    log('请求出错: ' + e.message, 'fail');
+  } finally {
+    hideLoading();
+  }
+});
 
 // 节点属性弹窗
 document.getElementById('btn-np-save').addEventListener('click', saveNodeProps);

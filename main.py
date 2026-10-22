@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional, List
-from core import tasks, wgconf, tcp_rtt
+from core import tasks, wgconf, tcp_rtt, mesh
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
@@ -233,6 +233,27 @@ def api_wg_deploy(body: WgPathBody):
     if not ok:
         return {"ok": False, "error": err, "results": []}
     return wgconf.deploy_path(cfg, body.path)
+
+
+class MeshBody(BaseModel):
+    nodes: Optional[List[str]] = None
+
+
+@app.post("/api/mesh/deploy")
+def api_mesh_deploy(body: MeshBody = Body(default=None)):
+    """全互联部署：选中节点两两点对点直连，并把 active_edges 置为完全图。"""
+    cfg = tasks.load_config()
+    selected = body.nodes if body else None
+    return mesh.deploy_mesh(cfg, selected)
+
+
+@app.get("/api/mesh/preview")
+def api_mesh_preview():
+    """预览全互联将生成的 conf（不部署）。"""
+    cfg = tasks.load_config()
+    confs = mesh.build_mesh_confs(cfg)
+    edges = mesh.full_mesh_edges(cfg)
+    return {"ok": True, "confs": confs, "edges": edges}
 
 
 class TcpRttBody(BaseModel):

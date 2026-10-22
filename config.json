@@ -114,19 +114,63 @@
   "active_edges": [
     {
       "source": "深圳",
+      "target": "上海"
+    },
+    {
+      "source": "深圳",
+      "target": "杭州"
+    },
+    {
+      "source": "深圳",
+      "target": "北京"
+    },
+    {
+      "source": "深圳",
       "target": "成都"
     },
     {
-      "source": "成都",
-      "target": "上海"
+      "source": "深圳",
+      "target": "青岛"
     },
     {
       "source": "上海",
       "target": "杭州"
     },
     {
+      "source": "上海",
+      "target": "北京"
+    },
+    {
+      "source": "上海",
+      "target": "成都"
+    },
+    {
+      "source": "上海",
+      "target": "青岛"
+    },
+    {
       "source": "杭州",
       "target": "北京"
+    },
+    {
+      "source": "杭州",
+      "target": "成都"
+    },
+    {
+      "source": "杭州",
+      "target": "青岛"
+    },
+    {
+      "source": "北京",
+      "target": "成都"
+    },
+    {
+      "source": "北京",
+      "target": "青岛"
+    },
+    {
+      "source": "成都",
+      "target": "青岛"
     }
   ]
 }

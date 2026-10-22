@@ -108,3 +108,13 @@ pre#log {
 .map-toolbar .hint { color: #8a93a0; font-size: 14px; margin-left: auto; }
 .map-toolbar select { background: #0f1216; border: 1px solid #3a414d; color: #e6e8ec; border-radius: 5px; padding: 7px 9px; font-size: 15px; }
 #map-canvas { flex: 1; background: #14171c; border: 1px solid #2c313a; border-radius: 8px; min-height: 0; }
+.map-body { flex: 1; display: flex; gap: 12px; min-height: 0; }
+.map-aside { width: 180px; min-width: 180px; flex-shrink: 0; background: #14171c; border: 1px solid #2c313a; border-radius: 8px; padding: 10px; overflow-y: auto; }
+.map-aside .aside-head { display: flex; justify-content: space-between; align-items: center; font-size: 13px; margin-bottom: 6px; color: #8a93a0; white-space: nowrap; }
+.map-aside .aside-head label { flex-direction: row; align-items: center; gap: 6px; font-size: 13px; }
+.map-toolbar label { flex-direction: row; align-items: center; gap: 8px; font-size: 15px; }
+#map-modal .modal-box input[type="checkbox"] { width: 16px; height: 16px; flex: 0 0 auto; }
+#viz-node-list li span { white-space: nowrap; }
+#viz-node-list { list-style: none; margin: 0; padding: 0; }
+#viz-node-list li { display: flex; align-items: center; gap: 7px; padding: 6px 7px; border-radius: 5px; cursor: pointer; font-size: 14px; }
+#viz-node-list li:hover { background: #22262d; }

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>蜘蛛网络控制台</title>
-<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/style.css?v=20261105">
 </head>
 <body>
 <header>
@@ -43,6 +43,9 @@
         <button data-action="schedule">下发定时任务</button>
         <button data-action="clean">清理定时器</button>
         <button data-action="list-timers">获取定时任务列表</button>
+      </div>
+      <div class="row">
+        <button id="btn-mesh-deploy">全互联部署（两两直连）</button>
       </div>
     </section>
 
@@ -192,12 +195,21 @@
       <span class="hint">滚轮缩放 · 拖拽平移 · 圆半径 = 两地物理距离 · 标注 = 本次 RTT</span>
       <button id="btn-viz-close" class="ghost">关闭</button>
     </div>
-    <div id="map-canvas"></div>
+    <div class="map-body">
+      <aside class="map-aside">
+        <div class="aside-head">
+          <span>参考节点（圆心）</span>
+          <label><input type="checkbox" id="viz-check-all" checked> 全选</label>
+        </div>
+        <ul id="viz-node-list"></ul>
+      </aside>
+      <div id="map-canvas"></div>
+    </div>
   </div>
 </div>
 
 <script src="/static/vendor/cytoscape.min.js"></script>
 <script src="/static/vendor/echarts.min.js"></script>
-<script src="/static/app.js?v=20261031"></script>
+<script src="/static/app.js?v=20261109"></script>
 </body>
 </html>
