@@ -16,9 +16,7 @@
       "listen_port": 51820,
       "dynamic": false,
       "key_dir": "深圳",
-      "role": "gateway",
-      "lat": 22.54,
-      "lng": 114.06
+      "role": "gateway"
     },
     {
       "name": "上海",
@@ -28,9 +26,7 @@
       "listen_port": 51820,
       "dynamic": false,
       "key_dir": "上海",
-      "role": "server",
-      "lat": 31.23,
-      "lng": 121.47
+      "role": "server"
     },
     {
       "name": "杭州",
@@ -40,9 +36,7 @@
       "listen_port": 51820,
       "dynamic": false,
       "key_dir": "杭州",
-      "role": "relay",
-      "lat": 30.27,
-      "lng": 120.15
+      "role": "relay"
     },
     {
       "name": "北京",
@@ -52,9 +46,7 @@
       "listen_port": 51820,
       "dynamic": false,
       "key_dir": "北京",
-      "role": "client",
-      "lat": 39.9,
-      "lng": 116.4
+      "role": "client"
     },
     {
       "name": "成都",
@@ -64,9 +56,7 @@
       "listen_port": 51820,
       "dynamic": false,
       "key_dir": "成都",
-      "role": "relay",
-      "lat": 30.57,
-      "lng": 104.07
+      "role": "relay"
     },
     {
       "name": "青岛",
@@ -76,9 +66,7 @@
       "listen_port": 51820,
       "dynamic": false,
       "key_dir": "青岛",
-      "role": "relay",
-      "lat": 36.07,
-      "lng": 120.38
+      "role": "relay"
     }
   ],
   "edges": [
@@ -114,63 +102,19 @@
   "active_edges": [
     {
       "source": "深圳",
-      "target": "上海"
-    },
-    {
-      "source": "深圳",
-      "target": "杭州"
-    },
-    {
-      "source": "深圳",
-      "target": "北京"
-    },
-    {
-      "source": "深圳",
       "target": "成都"
-    },
-    {
-      "source": "深圳",
-      "target": "青岛"
-    },
-    {
-      "source": "上海",
-      "target": "杭州"
-    },
-    {
-      "source": "上海",
-      "target": "北京"
-    },
-    {
-      "source": "上海",
-      "target": "成都"
-    },
-    {
-      "source": "上海",
-      "target": "青岛"
-    },
-    {
-      "source": "杭州",
-      "target": "北京"
-    },
-    {
-      "source": "杭州",
-      "target": "成都"
-    },
-    {
-      "source": "杭州",
-      "target": "青岛"
-    },
-    {
-      "source": "北京",
-      "target": "成都"
-    },
-    {
-      "source": "北京",
-      "target": "青岛"
     },
     {
       "source": "成都",
-      "target": "青岛"
+      "target": "上海"
+    },
+    {
+      "source": "上海",
+      "target": "杭州"
+    },
+    {
+      "source": "杭州",
+      "target": "北京"
     }
   ]
 }

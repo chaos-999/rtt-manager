@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>蜘蛛网络控制台</title>
-<link rel="stylesheet" href="/static/style.css?v=20261109">
+<link rel="stylesheet" href="/static/style.css?v=20261111">
 </head>
 <body>
 <header>
@@ -37,6 +37,7 @@
       <h2>拓扑部署</h2>
       <div class="row">
         <button id="btn-mesh-deploy">全互联部署（两两直连）</button>
+        <button id="btn-path-history" class="ghost">历史路径</button>
         <span class="muted small">将选中节点两两点对点直连，并把 active_edges 置为完全图</span>
       </div>
     </section>
@@ -48,6 +49,20 @@
         <button id="btn-add-time" class="ghost small">+ 添加定时</button>
       </div>
       <ul id="time-list" class="time-list"></ul>
+
+      <div class="batch-gen">
+        <span class="batch-gen-title">批量生成</span>
+        <label>起始 <input type="time" id="batch-start" step="1" value="10:00:00"></label>
+        <label>结束 <input type="time" id="batch-end" step="1" value="12:00:00"></label>
+        <label>每 <input type="number" id="batch-interval" value="30" min="1"></label>
+        <select id="batch-unit">
+          <option value="m">分钟</option>
+          <option value="s">秒</option>
+          <option value="h">小时</option>
+        </select>
+        <button id="btn-batch-gen" class="ghost small">生成定时</button>
+      </div>
+
       <div class="row">
         <label>次数 <input type="number" id="count" value="1000" min="1"></label>
         <button id="btn-schedule-batch">批量下发</button>
@@ -76,6 +91,7 @@
       <div class="row">
         <button id="btn-results-clean" class="ghost" disabled>执行清理</button>
         <button id="btn-viz">数据可视化</button>
+        <button id="btn-export-ds" class="ghost">生成训练集</button>
       </div>
     </section>
 
@@ -157,6 +173,8 @@
       <label>密钥目录 <input type="text" id="np-keydir"></label>
       <label>监听端口 <input type="number" id="np-port" min="1"></label>
       <label>动态IP <input type="text" id="np-dynamic" placeholder="留空=否，填1=是(无Endpoint)"></label>
+      <label>纬度 <input type="text" id="np-lat" placeholder="如 39.90"></label>
+      <label>经度 <input type="text" id="np-lng" placeholder="如 116.40"></label>
     </div>
     <div class="modal-actions">
       <button id="btn-np-save">保存</button>
@@ -236,8 +254,36 @@
   </div>
 </div>
 
+<!-- 生成训练集 -->
+<div id="export-modal" class="modal hidden">
+  <div class="modal-box" style="width:480px;">
+    <h2>生成 ML 训练集</h2>
+    <p class="muted small">选择要合并的测量批次（默认全选）。输出到结果目录下的 <code>dataset_rtt.csv</code>，可直接用 Pandas / PyTorch / sklearn 读取。</p>
+    <div class="export-head">
+      <label><input type="checkbox" id="export-check-all" checked> 全选</label>
+    </div>
+    <ul id="export-batch-list" class="export-batch-list"></ul>
+    <div class="modal-actions">
+      <button id="btn-export-ok">生成</button>
+      <button id="btn-export-cancel" class="ghost">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- 历史路径 -->
+<div id="history-modal" class="modal hidden">
+  <div class="modal-box" style="width:560px;">
+    <h2>历史路径</h2>
+    <p class="muted small">点击「部署」会用该路径重新生成并下发 wg0.conf（全互联部署不记录）。</p>
+    <ul id="history-list" class="history-list"></ul>
+    <div class="modal-actions">
+      <button id="btn-history-close" class="ghost">关闭</button>
+    </div>
+  </div>
+</div>
+
 <script src="/static/vendor/cytoscape.min.js"></script>
 <script src="/static/vendor/echarts.min.js"></script>
-<script src="/static/app.js?v=20261112"></script>
+<script src="/static/app.js?v=20261116"></script>
 </body>
 </html>

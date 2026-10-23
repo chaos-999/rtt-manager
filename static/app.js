@@ -292,6 +292,8 @@ function loadTopo() {
         listen_port: n.listen_port || 51820,
         key_dir: n.key_dir || '',
         dynamic: !!n.dynamic,
+        lat: n.lat,
+        lng: n.lng,
         routes: n.routes || []
       },
       position: { x: n.pos_x || Math.random() * 500, y: n.pos_y || Math.random() * 400 }
@@ -338,6 +340,8 @@ function editNode(node) {
   document.getElementById('np-keydir').value = d.key_dir || '';
   document.getElementById('np-port').value = d.listen_port || 51820;
   document.getElementById('np-dynamic').value = d.dynamic ? '1' : '';
+  document.getElementById('np-lat').value = (d.lat !== undefined && d.lat !== null) ? d.lat : '';
+  document.getElementById('np-lng').value = (d.lng !== undefined && d.lng !== null) ? d.lng : '';
   document.getElementById('node-props-modal').classList.remove('hidden');
 }
 
@@ -366,7 +370,15 @@ function saveNodeProps() {
     public_key: document.getElementById('np-pubkey').value.trim(),
     listen_port: parseInt(document.getElementById('np-port').value) || 51820,
     key_dir: document.getElementById('np-keydir').value.trim(),
-    dynamic: document.getElementById('np-dynamic').value.trim() === '1'
+    dynamic: document.getElementById('np-dynamic').value.trim() === '1',
+    lat: (() => {
+      const v = document.getElementById('np-lat').value.trim();
+      return (v === '' || isNaN(parseFloat(v))) ? undefined : parseFloat(v);
+    })(),
+    lng: (() => {
+      const v = document.getElementById('np-lng').value.trim();
+      return (v === '' || isNaN(parseFloat(v))) ? undefined : parseFloat(v);
+    })()
   });
   document.getElementById('node-props-modal').classList.add('hidden');
 }
@@ -383,6 +395,8 @@ function saveTopo() {
       dynamic: d.dynamic,
       key_dir: d.key_dir,
       role: d.role,
+      lat: d.lat,
+      lng: d.lng,
       routes: d.routes || [],
       pos_x: p.x, pos_y: p.y
     };
@@ -535,7 +549,9 @@ document.getElementById('btn-save-config').addEventListener('click', async () =>
   if (cy) {
     loadTopo();
   }
-  logClear(); log('配置已保存', 'ok');
+  logClear();
+  log('配置已保存', 'ok');
+  warnIfIpConflicts(config.nodes);
 });
 
 // 拓扑弹窗
@@ -566,10 +582,37 @@ document.getElementById('btn-topo-connect').addEventListener('click', () => {
 document.getElementById('btn-topo-layout').addEventListener('click', () => {
   cy.layout({ name: 'cose', animate: true, padding: 40 }).run();
 });
+function findIpConflicts(nodes) {
+  const groups = {};
+  for (const n of (nodes || [])) {
+    const ip = (n.wg_ip || '').trim();
+    if (!ip) continue;
+    if (!groups[ip]) groups[ip] = [];
+    groups[ip].push(n.name || '?');
+  }
+  return Object.entries(groups)
+    .filter(([, names]) => names.length > 1)
+    .map(([ip, names]) => ({ ip, names }));
+}
+
+function warnIfIpConflicts(nodes) {
+  const conflicts = findIpConflicts(nodes);
+  if (!conflicts.length) return;
+  const text = conflicts
+    .map(c => `${c.ip} 被「${c.names.join('」「')}」同时使用`)
+    .join('\n');
+  alert(`检测到内网 IP 冲突（配置已保留，未做修改）\n\n${text}\n\n请修改后再部署，否则 WireGuard 网络会异常。`);
+  logClear();
+  log('⚠ 内网 IP 冲突：' + conflicts.map(c => c.ip).join('、'), 'fail');
+}
+
+// 保存拓扑时提示冲突（不修改配置）
 document.getElementById('btn-topo-save').addEventListener('click', async () => {
   await saveTopo();
   renderNodes();
-  logClear(); log('拓扑已保存', 'ok');
+  logClear();
+  log('拓扑已保存', 'ok');
+  warnIfIpConflicts(config.nodes);
 });
 document.getElementById('btn-topo-path').addEventListener('click', () => setPathMode(!pathMode));
 document.getElementById('btn-path-clear').addEventListener('click', clearPath);
@@ -1064,22 +1107,22 @@ document.getElementById('btn-schedule-batch').addEventListener('click', async ()
   if (!scheduledTimes.length) { alert('请先添加至少一个定时'); return; }
   const count = parseInt(document.getElementById('count').value) || 1000;
   const nodes = selectedNodes();
-  if (!confirm(`将向 ${nodes.length ? nodes.length + ' 个' : '全部'}节点下发 ${scheduledTimes.length} 个定时任务：\n${scheduledTimes.join('、')}\n\n次数：${count}`)) return;
+  const preview = scheduledTimes.length > 12
+    ? scheduledTimes.slice(0, 12).join('、') + ` …（共 ${scheduledTimes.length} 个）`
+    : scheduledTimes.join('、');
+  if (!confirm(`将向 ${nodes.length ? nodes.length + ' 个' : '全部'}节点下发 ${scheduledTimes.length} 个定时任务：\n${preview}\n\n次数：${count}`)) return;
   showLoading();
   logClear();
   log(`批量下发 ${scheduledTimes.length} 个定时，次数=${count}`, 'warn');
   try {
-    for (const t of scheduledTimes) {
-      log(`\n[${t}]`, 'warn');
-      const r = await fetch('/api/tasks/schedule', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ start_time: t, count, nodes })
-      });
-      const d = await r.json();
-      (d.results || []).forEach(x => {
-        log(`  ${x.name}: ${x.ok ? '成功' : '失败'}`, x.ok ? 'ok' : 'fail');
-      });
-    }
+    const r = await fetch('/api/tasks/schedule_many', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ times: scheduledTimes, count, nodes })
+    });
+    const d = await r.json();
+    (d.results || []).forEach(x => {
+      log(`[${x.name}] ${x.ok ? '成功' : '失败'} — ${x.detail}`, x.ok ? 'ok' : 'fail');
+    });
     log('\n--- 批量下发完成 ---', 'warn');
   } catch (e) {
     log('下发出错: ' + e.message, 'fail');
@@ -1087,6 +1130,167 @@ document.getElementById('btn-schedule-batch').addEventListener('click', async ()
     hideLoading();
   }
 });
+
+// 按起止时间 + 间隔批量生成定时
+document.getElementById('btn-batch-gen').addEventListener('click', () => {
+  const start = document.getElementById('batch-start').value;
+  const end = document.getElementById('batch-end').value;
+  const interval = parseInt(document.getElementById('batch-interval').value) || 1;
+  const unit = document.getElementById('batch-unit').value;
+  if (!start || !end) { alert('请填写起始和结束时间'); return; }
+
+  const toSec = t => {
+    const p = t.split(':').map(Number);
+    return (p[0] || 0) * 3600 + (p[1] || 0) * 60 + (p[2] || 0);
+  };
+  const fmt = sec => {
+    sec = ((sec % 86400) + 86400) % 86400;
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
+  const s0 = toSec(start), e0 = toSec(end);
+  const step = unit === 'h' ? interval * 3600 : unit === 'm' ? interval * 60 : interval;
+  if (step <= 0) { alert('间隔必须大于 0'); return; }
+  if (e0 < s0) { alert('结束时间不能早于起始时间'); return; }
+
+  const total = Math.floor((e0 - s0) / step) + 1;
+  if (total > 500 && !confirm(`将生成 ${total} 个定时，数量较多（下发会较慢），确认继续？`)) return;
+
+  const added = [];
+  for (let t = s0; t <= e0; t += step) {
+    const str = fmt(t);
+    if (!scheduledTimes.includes(str)) {
+      scheduledTimes.push(str);
+      added.push(str);
+    }
+  }
+  scheduledTimes.sort();
+  renderTimeList();
+
+  const unitName = unit === 'h' ? '小时' : unit === 'm' ? '分钟' : '秒';
+  logClear();
+  log(`批量生成：${start} ~ ${end}，每 ${interval} ${unitName}，区间共 ${total} 个，新增 ${added.length} 个`, 'ok');
+});
+
+// ================= 训练集导出 =================
+document.getElementById('btn-export-ds').addEventListener('click', async () => {
+  const r = await fetch('/api/results/batches');
+  const d = await r.json();
+  const batches = d.batches || [];
+  if (!batches.length) { alert('没有可用的测量批次'); return; }
+  const ul = document.getElementById('export-batch-list');
+  ul.innerHTML = '';
+  batches.forEach(b => {
+    const li = document.createElement('li');
+    li.innerHTML = `<label><input type="checkbox" data-name="${b.name}" checked> ${b.name}</label><span class="muted">${b.files} CSV</span>`;
+    li.querySelector('input').addEventListener('change', syncExportAll);
+    ul.appendChild(li);
+  });
+  document.getElementById('export-check-all').checked = true;
+  document.getElementById('export-modal').classList.remove('hidden');
+});
+
+function syncExportAll() {
+  const boxes = document.querySelectorAll('#export-batch-list input[type=checkbox]');
+  document.getElementById('export-check-all').checked =
+    boxes.length > 0 && Array.from(boxes).every(b => b.checked);
+}
+
+document.getElementById('export-check-all').addEventListener('change', (e) => {
+  document.querySelectorAll('#export-batch-list input[type=checkbox]').forEach(b => b.checked = e.target.checked);
+});
+
+document.getElementById('btn-export-cancel').addEventListener('click', () => {
+  document.getElementById('export-modal').classList.add('hidden');
+});
+
+document.getElementById('btn-export-ok').addEventListener('click', async () => {
+  const batches = [];
+  document.querySelectorAll('#export-batch-list input[type=checkbox]').forEach(b => {
+    if (b.checked) batches.push(b.dataset.name);
+  });
+  if (!batches.length) { alert('请至少选择一个批次'); return; }
+  showLoading();
+  try {
+    const r = await fetch('/api/results/export', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ batches })
+    });
+    const d = await r.json();
+    logClear();
+    if (!d.ok) { log('生成失败: ' + (d.error || ''), 'fail'); return; }
+    log(`训练集已生成：${d.rows} 行`, 'ok');
+    log(`文件：${d.path}`, 'ok');
+    log(`合并批次：${(d.batches_used || []).join('、')}`, 'warn');
+    document.getElementById('export-modal').classList.add('hidden');
+  } catch (e) {
+    log('生成出错: ' + e.message, 'fail');
+  } finally {
+    hideLoading();
+  }
+});
+
+// ================= 历史路径（一键回滚） =================
+document.getElementById('btn-path-history').addEventListener('click', async () => {
+  const r = await fetch('/api/path/history');
+  const d = await r.json();
+  const ul = document.getElementById('history-list');
+  ul.innerHTML = '';
+  const hist = d.history || [];
+  if (!hist.length) {
+    ul.innerHTML = '<li class="empty">暂无历史路径（部署路径成功后会自动记录，全互联部署不记录）</li>';
+  } else {
+    hist.forEach(h => {
+      const li = document.createElement('li');
+      li.innerHTML = `
+        <div class="hpath">${(h.path || []).join(' ⇄ ')}</div>
+        <div class="htime">${h.time || ''}</div>
+        <button class="small">部署</button>
+      `;
+      li.querySelector('button').addEventListener('click', () => rollbackPath(h));
+      ul.appendChild(li);
+    });
+  }
+  document.getElementById('history-modal').classList.remove('hidden');
+});
+
+document.getElementById('btn-history-close').addEventListener('click', () => {
+  document.getElementById('history-modal').classList.add('hidden');
+});
+
+async function rollbackPath(h) {
+  const path = h.path || [];
+  if (path.length < 2) { alert('路径无效'); return; }
+  if (!confirm(`用历史路径重新部署？\n\n${path.join(' ⇄ ')}\n\n将覆盖这些节点的 wg0.conf 并重启 WireGuard。`)) return;
+  showLoading();
+  try {
+    const r = await fetch('/api/wg/deploy', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path })
+    });
+    const d = await r.json();
+    document.getElementById('history-modal').classList.add('hidden');
+    logClear();
+    if (!d.ok) { log('回滚部署失败: ' + (d.error || ''), 'fail'); return; }
+    log(`回滚部署：${path.join(' ⇄ ')}`, 'warn');
+    (d.results || []).forEach(res => {
+      log(`\n===== ${res.name} =====`, 'warn');
+      (res.steps || []).forEach(s => {
+        log(`  [${s.name}] ${s.ok ? '✓' : '✗'}`, s.ok ? 'ok' : 'fail');
+        if (!s.ok) log(`    输出: ${s.output || ''}`);
+      });
+      log(`  → ${res.name} ${res.ok ? '部署成功' : '部署失败'}`, res.ok ? 'ok' : 'fail');
+    });
+    log('--- 回滚结束 ---', 'warn');
+  } catch (e) {
+    log('回滚出错: ' + e.message, 'fail');
+  } finally {
+    hideLoading();
+  }
+}
 
 // 全互联部署（O(n^2) 两两直连）
 document.getElementById('btn-mesh-deploy').addEventListener('click', async () => {

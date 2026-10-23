@@ -20,7 +20,7 @@ import tempfile
 from concurrent.futures import ThreadPoolExecutor
 
 from . import ssh
-from .tasks import find_key
+from .tasks import find_key, probe_nodes, check_ip_conflicts
 from .paths import app_dir
 
 CONFIG_PATH = os.path.join(app_dir(), "config.json")
@@ -242,6 +242,18 @@ def deploy_path(cfg, path):
     """
     node_map = _node_map(cfg)
 
+    # 部署前校验：内网 IP 冲突（只提示，不修改配置）
+    conflicts = check_ip_conflicts(cfg.get("nodes", []))
+    if conflicts:
+        msg = "; ".join(f"{ip} 被 {a}、{b} 同时使用" for ip, a, b in conflicts)
+        return {"ok": False, "error": f"内网 IP 冲突，已拦截：{msg}", "results": []}
+
+    # 部署前探活：路径上任一节点不可达则整体失败（避免部署后断链）
+    _, unreachable = probe_nodes(cfg, path)
+    if unreachable:
+        names = "、".join(u["name"] for u in unreachable)
+        return {"ok": False, "error": f"节点探活失败，已拦截：{names}", "results": []}
+
     # 先并行幂等获取所有节点的私钥
     def _fetch_key(name):
         node = node_map[name]
@@ -283,8 +295,9 @@ def deploy_path(cfg, path):
             active.append({"source": a, "target": b})
         cfg["active_edges"] = active
         try:
-            from .tasks import save_config
+            from .tasks import save_config, save_path_history
             save_config(cfg)
+            save_path_history(path)
         except Exception:
             pass
 

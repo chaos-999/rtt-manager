@@ -6,6 +6,9 @@ import os
 import json
 import time
 import shutil
+import hashlib
+import hmac
+import secrets
 from concurrent.futures import ThreadPoolExecutor
 from . import ssh
 from .paths import app_dir, res_dir
@@ -37,21 +40,34 @@ def _ensure_config_file():
         json.dump(minimal, f, ensure_ascii=False, indent=2)
 
 
-def _map_nodes(cfg, selected, worker):
-    """并行执行 worker(node) 于所有选中节点，保持顺序返回结果列表。
+def _map_nodes(cfg, selected, worker, only_names=None):
+    """并行执行 worker(node) 于选中节点，保持顺序返回结果列表。
 
-    worker(node) 返回结果 dict（或 None 表示跳过）。
-    用线程池并行，把串行 N 节点耗时降为最慢单节点耗时。
+    only_names 不为 None 时，只处理名单内的节点（用于探活后剔除不可达节点）。
     """
-    nodes = [n for n in cfg["nodes"] if not selected or n["name"] in selected]
+    if only_names is not None:
+        nodes = [n for n in cfg["nodes"] if n["name"] in only_names]
+    else:
+        nodes = [n for n in cfg["nodes"] if not selected or n["name"] in selected]
     if not nodes:
         return []
     with ThreadPoolExecutor(max_workers=len(nodes)) as ex:
         return [r for r in ex.map(worker, nodes) if r is not None]
 
 
+PBKDF2_ITERATIONS = 200000
+PBKDF2_PREFIX = "pbkdf2_sha256"
+
+
+def _hash_password(pwd, salt=None, iterations=PBKDF2_ITERATIONS):
+    if salt is None:
+        salt = secrets.token_bytes(16)
+    dk = hashlib.pbkdf2_hmac("sha256", pwd.encode("utf-8"), salt, iterations)
+    return f"{PBKDF2_PREFIX}${iterations}${salt.hex()}${dk.hex()}"
+
+
 def get_password():
-    """读取管理员密码；不存在返回 None。"""
+    """读取密码记录（可能是哈希串或旧明文）；不存在返回 None。"""
     if os.path.isfile(PWD_PATH):
         with open(PWD_PATH, "r", encoding="utf-8") as f:
             return f.read().strip()
@@ -59,10 +75,75 @@ def get_password():
 
 
 def set_password(pwd):
-    """写入管理员密码（明文，隐藏文件）。"""
+    """写入管理员密码（PBKDF2 加盐哈希，隐藏文件）。"""
     os.makedirs(os.path.dirname(PWD_PATH), exist_ok=True)
     with open(PWD_PATH, "w", encoding="utf-8") as f:
-        f.write(pwd)
+        f.write(_hash_password(pwd))
+
+
+def verify_password(pwd):
+    """校验密码；兼容旧明文记录，验证成功后自动升级为哈希。"""
+    stored = get_password()
+    if stored is None:
+        return False
+    if stored.startswith(PBKDF2_PREFIX + "$"):
+        try:
+            _, iters, salt_hex, hash_hex = stored.split("$", 3)
+            dk = hashlib.pbkdf2_hmac(
+                "sha256", pwd.encode("utf-8"), bytes.fromhex(salt_hex), int(iters)
+            )
+            return hmac.compare_digest(dk.hex(), hash_hex)
+        except Exception:
+            return False
+    # 旧版明文：比对成功后自动升级
+    if hmac.compare_digest(pwd, stored):
+        try:
+            set_password(pwd)
+        except Exception:
+            pass
+        return True
+    return False
+
+
+def check_ip_conflicts(nodes):
+    """检查节点内网 IP（wg_ip）是否有重复。返回 [(ip, name_a, name_b), ...]。"""
+    seen = {}
+    conflicts = []
+    for n in nodes or []:
+        ip = (n.get("wg_ip") or "").strip()
+        if not ip:
+            continue
+        if ip in seen:
+            conflicts.append((ip, seen[ip], n.get("name", "?")))
+        else:
+            seen[ip] = n.get("name", "?")
+    return conflicts
+
+
+def probe_nodes(cfg, selected=None, timeout=5):
+    """轻量探活：并行 ssh 执行 echo。返回 (reachable_names, unreachable_list)。
+
+    unreachable_list: [{"name": ..., "detail": ...}]
+    """
+    def worker(n):
+        key = find_key(cfg, n)
+        if not key:
+            return n["name"], False, "找不到密钥"
+        code, out, err = ssh.run_ssh(n["ip"], key, "echo 1", timeout=timeout, retries=1)
+        ok = code == 0 and "1" in out
+        return n["name"], ok, (err or out).strip()[:200]
+
+    nodes = [n for n in cfg.get("nodes", []) if not selected or n["name"] in selected]
+    reachable, unreachable = [], []
+    if not nodes:
+        return reachable, unreachable
+    with ThreadPoolExecutor(max_workers=len(nodes)) as ex:
+        for name, ok, detail in ex.map(worker, nodes):
+            if ok:
+                reachable.append(name)
+            else:
+                unreachable.append({"name": name, "detail": detail})
+    return reachable, unreachable
 
 
 def is_first_start():
@@ -159,6 +240,42 @@ def schedule_task(cfg, start_time, count, selected=None):
         code, out, err = ssh.run_ssh(n["ip"], key, cmd)
         return {"name": n["name"], "ip": n["ip"], "ok": code == 0, "detail": (out + err).strip()}
     return _map_nodes(cfg, selected, worker)
+
+
+def schedule_many(cfg, times, count, selected=None):
+    """批量下发多个定时任务：每个节点只建一次 SSH，依次创建多个 systemd-run。
+
+    先并行探活，剔除不可达节点，再对可达节点下发。
+    """
+    reachable, unreachable = probe_nodes(cfg, selected)
+    results = [
+        {"name": u["name"], "ip": "", "ok": False,
+         "detail": "探活失败，已剔除（可能宕机或网络不通）"}
+        for u in unreachable
+    ]
+    if not reachable:
+        return results
+
+    def worker(n):
+        key = find_key(cfg, n)
+        if not key:
+            return {"name": n["name"], "ip": n["ip"], "ok": False, "detail": "找不到密钥"}
+        parts = [_remote_clean_cmd()]
+        for i, t in enumerate(times):
+            time_str = t.replace(":", "")
+            parts.append(
+                f"systemd-run --on-calendar=\"{t}\" "
+                f"--unit=\"sync-{time_str}-{i}-$(date +%s)\" /bin/bash -c "
+                f"\"TAG={time_str} /root/tcp_rtt.sh {count} > /root/rtt_results/sync_{time_str}_$(hostname).log 2>&1\""
+            )
+        script = "; ".join(parts) + "; echo SCHEDULED_ALL"
+        code, out, err = ssh.run_ssh(n["ip"], key, script, timeout=180)
+        ok = code == 0 and "SCHEDULED_ALL" in out
+        return {"name": n["name"], "ip": n["ip"], "ok": ok,
+                "detail": f"已下发 {len(times)} 个定时" if ok else (out + err).strip()[-400:]}
+
+    results.extend(_map_nodes(cfg, selected, worker, only_names=set(reachable)))
+    return results
 
 
 # ---------------- 清理定时器 ----------------
@@ -384,6 +501,146 @@ def list_batches(cfg):
                     continue
     batches.sort(key=lambda x: x["mtime"], reverse=True)
     return batches
+
+
+def export_dataset(cfg, batches=None):
+    """把所有（或选中）批次的摘要 CSV 合并成一个 tidy 训练集。
+
+    输出到 results_dir/dataset_rtt.csv（标准 CSV，Pandas/PyTorch/sklearn 直接可用）。
+    每行 = 一条链路测量；列包含端点、经纬度、物理距离（标签）与 RTT 统计特征。
+    """
+    import csv as csvmod
+    from math import radians, sin, cos, asin, sqrt
+
+    results_dir = cfg.get("results_dir", "")
+    if not results_dir or not os.path.isdir(results_dir):
+        return {"ok": False, "error": "结果目录不存在，请先配置 results_dir"}
+
+    node_coords = {}
+    for n in cfg.get("nodes", []):
+        lat, lng = n.get("lat"), n.get("lng")
+        if lat is not None and lng is not None:
+            try:
+                node_coords[n["name"]] = (float(lat), float(lng))
+            except (ValueError, TypeError):
+                pass
+
+    all_batches = [
+        d for d in os.listdir(results_dir)
+        if d.startswith("Meas_") and os.path.isdir(os.path.join(results_dir, d))
+    ]
+    use = [b for b in all_batches if not batches or b in batches]
+    use.sort()
+    if not use:
+        return {"ok": False, "error": "没有可用的测量批次"}
+
+    def haversine_km(lat1, lng1, lat2, lng2):
+        R = 6371.0
+        dlat = radians(lat2 - lat1)
+        dlng = radians(lng2 - lng1)
+        a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlng / 2) ** 2
+        return 2 * R * asin(sqrt(a))
+
+    header = [
+        "batch", "src", "dst",
+        "src_lat", "src_lng", "dst_lat", "dst_lng", "distance_km",
+        "rtt_min", "rtt_avg", "rtt_stddev", "rtt_p95", "rtt_max",
+        "loss_pct", "n_samples",
+    ]
+    rows = []
+    for b in use:
+        bdir = os.path.join(results_dir, b)
+        try:
+            files = [f for f in os.listdir(bdir) if f.endswith(".csv") and ".raw." not in f]
+        except OSError:
+            continue
+        for fn in files:
+            p = os.path.join(bdir, fn)
+            try:
+                with open(p, "r", encoding="utf-8", errors="replace") as f:
+                    for r in csvmod.DictReader(f):
+                        src = (r.get("src") or "").strip()
+                        dst = (r.get("dst") or "").strip()
+                        if not src or not dst or src == dst:
+                            continue
+                        try:
+                            mn = float(r.get("min_ms") or 0)
+                            avg = float(r.get("avg_ms") or 0)
+                            mx = float(r.get("max_ms") or 0)
+                            sd = float(r.get("stddev_ms") or 0)
+                            p95 = float(r.get("p95_ms") or 0)
+                            loss = float(r.get("loss_pct") or 0)
+                            nsent = int(float(r.get("sent") or 0))
+                        except (ValueError, TypeError):
+                            continue
+                        if avg == 0:
+                            continue
+
+                        sc = node_coords.get(src)
+                        dc = node_coords.get(dst)
+                        src_lat = src_lng = dst_lat = dst_lng = dist = ""
+                        if sc and dc:
+                            src_lat, src_lng = sc
+                            dst_lat, dst_lng = dc
+                            dist = round(haversine_km(sc[0], sc[1], dc[0], dc[1]), 3)
+
+                        rows.append([
+                            b, src, dst, src_lat, src_lng, dst_lat, dst_lng, dist,
+                            mn, avg, sd, p95, mx, loss, nsent,
+                        ])
+            except Exception:
+                continue
+
+    if not rows:
+        return {"ok": False, "error": "选中批次中未解析到有效测量数据"}
+
+    out = os.path.join(results_dir, "dataset_rtt.csv")
+    try:
+        with open(out, "w", encoding="utf-8-sig", newline="") as f:
+            w = csvmod.writer(f)
+            w.writerow(header)
+            w.writerows(rows)
+    except Exception as e:
+        return {"ok": False, "error": f"写入失败: {e}"}
+
+    # 生成后自动拉起结果文件夹
+    try:
+        os.startfile(results_dir)
+    except Exception:
+        pass
+
+    return {"ok": True, "path": out, "rows": len(rows), "batches_used": use}
+
+
+# ---------------- 历史路径（一键回滚用） ----------------
+HISTORY_PATH = os.path.join(app_dir(), "path_history.json")
+
+
+def load_path_history():
+    """读取历史路径记录（最近使用的在前）。"""
+    if not os.path.isfile(HISTORY_PATH):
+        return []
+    try:
+        with open(HISTORY_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
+
+
+def save_path_history(path):
+    """路径部署成功后记录（去重、置顶、最多 50 条）。全互联部署不调用。"""
+    hist = load_path_history()
+    key = tuple(path)
+    hist = [h for h in hist if tuple(h.get("path", [])) != key]
+    hist.insert(0, {"path": list(path), "time": time.strftime("%Y-%m-%d %H:%M:%S")})
+    hist = hist[:50]
+    try:
+        with open(HISTORY_PATH, "w", encoding="utf-8") as f:
+            json.dump(hist, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+    return hist
 
 
 def read_batch_data(cfg, batch):

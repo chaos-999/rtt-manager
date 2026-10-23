@@ -176,6 +176,22 @@ pre#log {
 .time-list-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .time-list-head span { color: var(--muted); font-size: 14px; }
 .panel-actions { margin-top: 6px; padding-top: 10px; border-top: 1px dashed var(--border); }
+.batch-gen {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: #0b0d12; border: 1px dashed var(--border-light); border-radius: 6px;
+  padding: 9px 12px; margin-bottom: 12px; font-size: 14px;
+}
+.batch-gen-title { color: var(--muted); font-size: 13px; }
+.batch-gen label { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+.batch-gen input[type="time"] {
+  background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 5px; padding: 5px 7px; font-size: 14px; font-family: Consolas, monospace;
+}
+.batch-gen input[type="number"] { width: 62px; padding: 5px 7px; font-size: 14px; }
+.batch-gen select {
+  background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 5px; padding: 5px 7px; font-size: 14px;
+}
 .time-list { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
 .time-list:empty { display: none; }
 .time-list li {
@@ -187,8 +203,7 @@ pre#log {
 .time-list li .del:hover { background: #a23144; }
 
 /* 时钟转盘 */
-.clock { display: flex; align-items: center; justify-content: center; gap: 4px; height: 180px; user-select: none; }
-.clock-col-wrap { position: relative; height: 180px; width: 66px; }
+.clock { display: flex; align-items: center; justify-content: center; gap: 4px; height: 180px; user-select: none; }.clock-col-wrap { position: relative; height: 180px; width: 66px; }
 .clock-col { height: 100%; width: 100%; overflow-y: scroll; scroll-snap-type: y mandatory; scrollbar-width: none; }
 .clock-col::-webkit-scrollbar { display: none; }
 .clock-pad { height: 72px; }
@@ -196,6 +211,25 @@ pre#log {
 .clock-item.active { color: #fff; font-weight: 700; }
 .clock-sep { font-size: 20px; color: #fff; padding-bottom: 4px; }
 .clock-preview { text-align: center; font-family: Consolas, monospace; font-size: 22px; color: var(--accent); margin: 8px 0 4px; }
+
+/* 训练集导出 */
+.export-head { display: flex; justify-content: flex-end; margin-bottom: 6px; }
+.export-head label { flex-direction: row; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+.export-batch-list { list-style: none; padding: 0; max-height: 220px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; background: #0b0d12; }
+.export-batch-list li { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-bottom: 1px solid var(--border); font-size: 14px; }
+.export-batch-list li:last-child { border-bottom: none; }
+.export-batch-list label { flex-direction: row; align-items: center; gap: 8px; color: var(--text); cursor: pointer; }
+.export-batch-list .muted { margin-left: auto; font-size: 12px; }
+
+/* 历史路径 */
+.history-list { list-style: none; padding: 0; max-height: 50vh; overflow-y: auto; }
+.history-list li {
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+  background: #0b0d12; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 8px;
+}
+.history-list .hpath { flex: 1; font-family: Consolas, monospace; font-size: 14px; }
+.history-list .htime { color: var(--muted); font-size: 12px; }
+.history-list .empty { color: var(--muted); font-size: 14px; justify-content: center; }
 
 /* 响应式 */
 @media (max-width: 900px) {

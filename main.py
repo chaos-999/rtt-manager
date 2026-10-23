@@ -53,6 +53,16 @@ class ScheduleBody(BaseModel):
     nodes: Optional[List[str]] = None
 
 
+class ScheduleManyBody(BaseModel):
+    times: List[str]
+    count: int = 1000
+    nodes: Optional[List[str]] = None
+
+
+class ExportBody(BaseModel):
+    batches: Optional[List[str]] = None
+
+
 class FetchBody(BaseModel):
     time_str: str = "153000"
     nodes: Optional[List[str]] = None
@@ -104,10 +114,9 @@ def auth_setup(body: SetupBody):
 
 @app.post("/api/auth/login")
 def auth_login(body: LoginBody):
-    pwd = tasks.get_password()
-    if pwd is None:
+    if tasks.get_password() is None:
         return {"ok": False, "error": "尚未设置密码"}
-    if body.password == pwd:
+    if tasks.verify_password(body.password):
         return {"ok": True}
     return {"ok": False, "error": "密码错误"}
 
@@ -141,6 +150,12 @@ def api_ntp(nodes: Optional[str] = None):
 def api_schedule(body: ScheduleBody):
     cfg = tasks.load_config()
     return {"results": tasks.schedule_task(cfg, body.start_time, body.count, body.nodes)}
+
+
+@app.post("/api/tasks/schedule_many")
+def api_schedule_many(body: ScheduleManyBody):
+    cfg = tasks.load_config()
+    return {"results": tasks.schedule_many(cfg, body.times, body.count, body.nodes)}
 
 
 @app.post("/api/tasks/clean")
@@ -177,6 +192,14 @@ def api_results_batches():
 def api_results_data(batch: str):
     cfg = tasks.load_config()
     return tasks.read_batch_data(cfg, batch)
+
+
+@app.post("/api/results/export")
+def api_results_export(body: ExportBody = Body(default=None)):
+    """生成 ML 训练集：合并选中批次的摘要 CSV 到 results_dir/dataset_rtt.csv。"""
+    cfg = tasks.load_config()
+    batches = body.batches if body else None
+    return tasks.export_dataset(cfg, batches)
 
 
 @app.post("/api/results/clean")
@@ -234,6 +257,12 @@ def api_wg_deploy(body: WgPathBody):
     if not ok:
         return {"ok": False, "error": err, "results": []}
     return wgconf.deploy_path(cfg, body.path)
+
+
+@app.get("/api/path/history")
+def api_path_history():
+    """历史部署路径（最近在前），供一键回滚选择。"""
+    return {"history": tasks.load_path_history()}
 
 
 class MeshBody(BaseModel):

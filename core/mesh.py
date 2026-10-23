@@ -13,7 +13,7 @@
 from concurrent.futures import ThreadPoolExecutor
 
 from . import wgconf
-from .tasks import find_key, save_config
+from .tasks import find_key, save_config, probe_nodes, check_ip_conflicts
 
 
 def _pick_nodes(cfg, selected=None, nodes=None):
@@ -63,6 +63,24 @@ def deploy_mesh(cfg, selected=None):
     if len(nodes) < 2:
         return {"ok": False, "error": "至少需要 2 个节点", "results": []}
 
+    # 部署前校验：内网 IP 冲突（只提示，不修改配置）
+    conflicts = check_ip_conflicts(cfg.get("nodes", []))
+    if conflicts:
+        msg = "; ".join(f"{ip} 被 {a}、{b} 同时使用" for ip, a, b in conflicts)
+        return {"ok": False, "error": f"内网 IP 冲突，已拦截：{msg}", "results": []}
+
+    # 探活：剔除不可达节点，其余照常部署
+    reachable, unreachable = probe_nodes(cfg, [n["name"] for n in nodes])
+    probe_fail = [
+        {"name": u["name"], "ok": False,
+         "steps": [{"name": "探活", "script": "echo 1", "ok": False,
+                    "output": "节点不可达，已从本次部署剔除"}]}
+        for u in unreachable
+    ]
+    nodes = [n for n in nodes if n["name"] in set(reachable)]
+    if len(nodes) < 2:
+        return {"ok": False, "error": "可用节点不足 2 个（探活剔除后）", "results": probe_fail}
+
     # 1) 并行幂等获取各节点私钥（复用 wgconf.ensure_keys）
     def _fetch_key(n):
         key_path = find_key(cfg, n)
@@ -101,4 +119,4 @@ def deploy_mesh(cfg, selected=None):
         except Exception:
             pass
 
-    return {"ok": True, "error": None, "results": results}
+    return {"ok": True, "error": None, "results": results + probe_fail}
