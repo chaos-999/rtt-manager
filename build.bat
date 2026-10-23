@@ -1,18 +1,17 @@
 @echo off
-chcp 65001 >nul
 cd /d "%~dp0"
 
-REM 读取 Python 路径（优先 python_path.txt）
+REM resolve python path (python_path.txt has priority)
 set "PY="
 if exist python_path.txt set /p PY=<python_path.txt
 if not defined PY where python >nul 2>nul && set "PY=python"
 if not defined PY (
-  echo [ERROR] Python not found. Edit python_path.txt.
+  echo [ERROR] Python not found. Edit python_path.txt with the full path to python.exe.
   pause
   exit /b 1
 )
 
-REM 首次打包时创建独立构建环境，避免把 Anaconda 全家桶打进去
+REM create an isolated build venv on first run (avoid bundling the whole Anaconda env)
 if not exist .venv-build (
   echo Creating build venv ...
   "%PY%" -m venv .venv-build
@@ -23,7 +22,7 @@ if not exist .venv-build (
 
 set "BUILD_PY=.venv-build\Scripts\python.exe"
 
-REM 从当前 Python 安装目录定位打包所需的 DLL（ffi/libssl/libcrypto）
+REM locate required DLLs (ffi/libssl/libcrypto) from the python installation
 for %%I in ("%PY%") do set "PYDIR=%%~dpI"
 set "DLLDIR=%PYDIR%Library\bin"
 if not exist "%DLLDIR%\ffi.dll" set "DLLDIR=%PYDIR%"
@@ -50,5 +49,5 @@ if errorlevel 1 ( echo Build failed & pause & exit /b 1 )
 
 echo.
 echo Done: dist\rtt-manager\rtt-manager.exe
-echo 整个 dist\rtt-manager 文件夹即为免安装绿色版，可直接复制到任意机器运行。
+echo Copy the whole dist\rtt-manager folder as the portable edition.
 pause
